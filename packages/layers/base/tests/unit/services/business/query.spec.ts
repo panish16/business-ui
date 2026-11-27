@@ -2,17 +2,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+import { mockAuthApi, mockBusinessApi } from '../../setup'
 
 const mockKeys = {
   addresses: vi.fn(),
   authInfo: vi.fn(),
   authorizedActions: vi.fn(),
   business: vi.fn(),
+  businessExt: vi.fn(),
   bootstrapFiling: vi.fn(),
+  courtOrders: vi.fn(),
   document: vi.fn(),
   filing: vi.fn(),
+  filingChanges: vi.fn(),
   filingComments: vi.fn(),
   filingDocumentUrls: vi.fn(),
+  filingValidateSection: vi.fn(),
   ledger: vi.fn(),
   linkedNameRequest: vi.fn(),
   parties: vi.fn(),
@@ -27,18 +32,9 @@ mockNuxtImport('useBusinessQueryKeys', () => {
   })
 })
 
-const mockBusinessApi = vi.fn()
-const mockAuthApi = vi.fn()
-mockNuxtImport('useNuxtApp', () => {
-  return () => ({
-    $businessApi: mockBusinessApi,
-    $authApi: mockAuthApi
-  })
-})
-
 describe('useBusinessQuery', () => {
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
   })
 
   const businessId = 'BC123'
@@ -49,11 +45,19 @@ describe('useBusinessQuery', () => {
 
     const options = addressesOptions(businessId)
     options.query({} as any)
-    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/addresses`)
-    expect(mockKeys.addresses).toHaveBeenCalledWith(businessId)
+    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/addresses`, { query: undefined })
+    expect(mockKeys.addresses).toHaveBeenCalledWith(businessId, undefined)
     expect(options.staleTime).toBe(DEFAULT_STALE_TIME)
 
-    const custom = addressesOptions(businessId, {
+    const withQuery = addressesOptions(businessId, { date: '2026-01-01' })
+    withQuery.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/addresses`,
+      { query: { date: '2026-01-01' } }
+    )
+    expect(mockKeys.addresses).toHaveBeenCalledWith(businessId, { date: '2026-01-01' })
+
+    const custom = addressesOptions(businessId, undefined, {
       enabled: false,
       staleTime: 30000
     })
@@ -118,6 +122,60 @@ describe('useBusinessQuery', () => {
     expect(mockKeys.business).toHaveBeenLastCalledWith(businessId, false, false)
   })
 
+  it('businessExtOptions should have correct config', () => {
+    const { businessExtOptions } = useBusinessQuery()
+
+    // basic
+    const basic = businessExtOptions(businessId)
+    basic.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/extended`, { query: undefined })
+    expect(mockKeys.businessExt).toHaveBeenCalledWith(businessId, false, undefined)
+    expect(basic.staleTime).toBe(DEFAULT_STALE_TIME)
+
+    // forCorrection
+    const forCorrection = businessExtOptions(businessId, true)
+    forCorrection.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/extended`, { query: { forCorrection: true } })
+    expect(mockKeys.businessExt).toHaveBeenCalledWith(businessId, true, undefined)
+    expect(forCorrection.staleTime).toBe(DEFAULT_STALE_TIME)
+
+    // forCorrection with filing type
+    const forCorrectionAndFiling = businessExtOptions(businessId, true, FilingType.CHANGE_OF_DIRECTORS)
+    forCorrectionAndFiling.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/extended/${FilingType.CHANGE_OF_DIRECTORS}`, { query: { forCorrection: true } })
+    expect(mockKeys.businessExt).toHaveBeenCalledWith(businessId, true, FilingType.CHANGE_OF_DIRECTORS)
+    expect(forCorrectionAndFiling.staleTime).toBe(DEFAULT_STALE_TIME)
+
+    // custom options
+    const custom = businessExtOptions(businessId, false, undefined, {
+      enabled: false,
+      staleTime: 500
+    })
+    expect(custom.enabled).toBe(false)
+    expect(custom.staleTime).toBe(500)
+    expect(mockKeys.businessExt).toHaveBeenLastCalledWith(businessId, false, undefined)
+  })
+
+  it('courtOrdersOptions should have correct config', () => {
+    const { courtOrdersOptions } = useBusinessQuery()
+
+    const options = courtOrdersOptions(businessId)
+    options.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/court-orders`)
+    expect(mockKeys.courtOrders).toHaveBeenCalledWith(businessId)
+    expect(options.staleTime).toBe(DEFAULT_STALE_TIME)
+
+    const custom = courtOrdersOptions(businessId, {
+      enabled: false,
+      staleTime: 30000
+    })
+    expect(custom.enabled).toBe(false)
+    expect(custom.staleTime).toBe(30000)
+  })
+
   it('documentOptions should have correct config', () => {
     const { documentOptions } = useBusinessQuery()
     const url = 'https://api.example.com/download'
@@ -161,13 +219,34 @@ describe('useBusinessQuery', () => {
 
     const options = filingOptions(businessId, filingId)
     options.query({} as any)
-    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/filings/${filingId}`)
-    expect(mockKeys.filing).toHaveBeenCalledWith(businessId, filingId)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/filings/${filingId}`,
+      { query: undefined }
+    )
+    expect(mockKeys.filing).toHaveBeenCalledWith(businessId, filingId, false)
     expect(options.staleTime).toBe(DEFAULT_STALE_TIME)
 
-    const custom = filingOptions(businessId, '12345', { staleTime: 5000 })
+    const custom = filingOptions(businessId, '12345', false, { staleTime: 5000 })
     expect(custom.staleTime).toBe(5000)
-    expect(mockKeys.filing).toHaveBeenCalledWith(businessId, '12345')
+    expect(mockKeys.filing).toHaveBeenCalledWith(businessId, '12345', false)
+
+    const publicOptions = filingOptions(businessId, filingId, true)
+    publicOptions.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(
+      `businesses/${businessId}/filings/${filingId}`,
+      { query: { public: true } }
+    )
+    expect(mockKeys.filing).toHaveBeenCalledWith(businessId, filingId, true)
+  })
+
+  it('filingChangesOptions should always be fresh', () => {
+    const { filingChangesOptions } = useBusinessQuery()
+
+    const options = filingChangesOptions(businessId, 55)
+    options.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/filings/55/changes`)
+    expect(mockKeys.filingChanges).toHaveBeenCalledWith(businessId, 55)
+    expect(options.staleTime).toBe(0)
   })
 
   it('filingCommentsOptions should have correct config', () => {
@@ -198,6 +277,29 @@ describe('useBusinessQuery', () => {
     const custom = filingDocumentUrlsOptions(businessId, '12345', { staleTime: 5000 })
     expect(custom.staleTime).toBe(5000)
     expect(mockKeys.filingDocumentUrls).toHaveBeenCalledWith(businessId, '12345')
+  })
+
+  it('filingValidateSectionOptions should have correct config', () => {
+    const { filingValidateSectionOptions } = useBusinessQuery()
+    const validatePayload = {
+      filingType: FilingType.CORRECTION,
+      section: 'nameRequest',
+      data: { legalName: 'Test Name LTD' },
+      filingSubType: FilingSubType.AMEND_RECEIVER
+    }
+
+    const options = filingValidateSectionOptions(businessId, validatePayload)
+    options.query({} as any)
+    expect(mockBusinessApi).toHaveBeenCalledWith(`businesses/${businessId}/filings/validate-section`, {
+      body: validatePayload,
+      method: 'POST'
+    })
+    expect(mockKeys.filingValidateSection).toHaveBeenCalledWith(businessId, validatePayload)
+    expect(options.staleTime).toBe(DEFAULT_STALE_TIME)
+
+    const custom = filingValidateSectionOptions(businessId, validatePayload, { staleTime: 5000 })
+    expect(custom.staleTime).toBe(5000)
+    expect(mockKeys.filingValidateSection).toHaveBeenCalledWith(businessId, validatePayload)
   })
 
   it('ledgerOptions should have correct config', () => {
@@ -242,7 +344,7 @@ describe('useBusinessQuery', () => {
 
   it('partiesOptions should have correct config', () => {
     const { partiesOptions } = useBusinessQuery()
-    const query = { role: 'director', status: 'active' }
+    const query = { role: RoleType.DIRECTOR, all: true }
 
     const options = partiesOptions(businessId, query)
     options.query({} as any)

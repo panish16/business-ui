@@ -1,9 +1,8 @@
 import { cloneDeep } from 'es-toolkit'
 // TODO - FUTURE - maybe consolidate 'delay' store with other dissolution filings if possible
 export const useDodStore = defineStore('delay-of-dissolution-store', () => {
-  const { currentAccount } = storeToRefs(useConnectAccountStore())
   const schema = getDodSchema()
-  const { getCommonFilingPayloadData, initFiling, createFilingPayload } = useFiling()
+  const { initFiling, formatFilingPayloadApi } = useFiling()
 
   const service = useBusinessService()
   const businessStore = useBusinessStore()
@@ -20,7 +19,7 @@ export const useDodStore = defineStore('delay-of-dissolution-store', () => {
     userDelays: 0
   })
 
-  const isStaff = computed(() => currentAccount.value.accountType === AccountType.STAFF)
+  const isStaff = useIsStaff()
 
   watch(() => formState.delay.option, (val) => {
     if (val === DelayOption.DEFAULT) {
@@ -41,8 +40,7 @@ export const useDodStore = defineStore('delay-of-dissolution-store', () => {
     const { draftFiling } = await initFiling<{ dissolution: DissolutionPayload }>(
       businessId,
       FilingType.DISSOLUTION,
-      filingSubType,
-      draftId
+      { filingSubType, draftId }
     )
 
     if (draftFiling?.filing) {
@@ -83,20 +81,19 @@ export const useDodStore = defineStore('delay-of-dissolution-store', () => {
     const dissolutionPayload: DissolutionPayload = {
       dissolutionType: dissolutionSubType.value,
       delayType: formState.delay.option,
-      ...getCommonFilingPayloadData(formState.courtOrder),
+      ...formatCommonFilingDataApi(formState.courtOrder),
       ...(formState.delay.option === DelayOption.CUSTOM
         ? { dissolutionDate: formState.delay.date }
         : {}
       )
     }
 
-    const payload = createFilingPayload<DissolutionApplication>(
+    const payload = formatFilingPayloadApi<DissolutionApplication>(
       businessStore.business!,
       FilingType.DISSOLUTION,
       { dissolution: dissolutionPayload },
       {
-        folioNumber: formState.folio.folioNumber,
-        ...(!isStaff.value ? { certifiedBy: formState.certify.legalName } : {})
+        folioNumber: formState.folio.folioNumber
       }
     )
 
@@ -109,7 +106,7 @@ export const useDodStore = defineStore('delay-of-dissolution-store', () => {
         payload,
         isSubmission,
         draftId as string | number,
-        headers
+        { headers }
       )
       draftFilingState.value = filingResp as unknown as FilingGetByIdResponse<DissolutionApplication>
       const urlParams = useUrlSearchParams()

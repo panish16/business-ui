@@ -1,7 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TableColumnIdentity } from '#components'
-import { mockGetColumnMeta, mockGetIsRowRemoved, mockGetTableBadges } from '../../../mocks/business-table-utils'
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+
+const { mockGetColumnMeta } = vi.hoisted(() => ({ mockGetColumnMeta: vi.fn() }))
+mockNuxtImport('getColumnMeta', () => mockGetColumnMeta)
+
+const { mockGetIsRowRemoved } = vi.hoisted(() => ({ mockGetIsRowRemoved: vi.fn() }))
+mockNuxtImport('getIsRowRemoved', () => mockGetIsRowRemoved)
+
+const { mockGetTableBadges } = vi.hoisted(() => ({ mockGetTableBadges: vi.fn() }))
+mockNuxtImport('getTableBadges', () => mockGetTableBadges)
 
 describe('getPartyNameColumn', () => {
   beforeEach(() => {
@@ -16,7 +25,7 @@ describe('getPartyNameColumn', () => {
     expect(mockGetColumnMeta).toHaveBeenCalledWith('first')
   })
 
-  it('renders a PERSON name correctly in uppercase without preferred name', () => {
+  it('renders a PERSON name in uppercase without preferred name', () => {
     const row = {
       original: {
         new: {
@@ -37,12 +46,13 @@ describe('getPartyNameColumn', () => {
 
     expect(cell.type).toBe(TableColumnIdentity)
     expect(cell.props.label).toBe('JOHN QUINCY DOE')
-    expect(cell.props.class).toBe('min-w-36 max-w-36 font-bold flex flex-col gap-2 break-words')
+    expect(cell.props.icon).toBe('i-mdi-account')
+    expect(cell.props.class).toBe('min-w-36 font-bold flex flex-col gap-2 break-words')
     expect(cell.children['additional-label']).toBeDefined()
     expect(cell.children['additional-label']()).toEqual([])
   })
 
-  it('renders a PERSON name correctly in uppercase with preferred name', () => {
+  it('renders a PERSON name in uppercase with preferred name', () => {
     const preferredName = 'Cool Cat'
     const row = {
       original: {
@@ -65,17 +75,119 @@ describe('getPartyNameColumn', () => {
 
     expect(cell.type).toBe(TableColumnIdentity)
     expect(cell.props.label).toBe('JOHN QUINCY DOE')
-    expect(cell.props.class).toBe('min-w-36 max-w-36 font-bold flex flex-col gap-2 break-words')
+    expect(cell.props.class).toBe('min-w-36 font-bold flex flex-col gap-2 break-words')
     expect(cell.children['additional-label']).toBeDefined()
     const slot = cell.children['additional-label']()
-    expect(slot.children.length).toBe(2)
-    expect(slot.children[0].children).toBe('Preferred Name:')
-    expect(slot.children[0].props.class).toBe('text-sm italic')
-    expect(slot.children[1].children).toBe(preferredName)
-    expect(slot.children[1].props.class).toBe('text-sm font-normal')
+    expect(slot.length).toBe(1)
+    const preferredDiv = slot[0]
+    expect(preferredDiv.children[0].children).toBe('Preferred Name:')
+    expect(preferredDiv.children[0].props.class).toBe('text-sm italic')
+    expect(preferredDiv.children[1].children).toBe(preferredName)
+    expect(preferredDiv.children[1].props.class).toBe('text-sm font-normal')
   })
 
-  it('renders a BUSINESS name correctly in uppercase', () => {
+  it('renders the former name for a NAME_CHANGED party by default', () => {
+    const row = {
+      original: {
+        new: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Smith'
+          },
+          actions: [ActionType.NAME_CHANGED]
+        },
+        old: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Doe'
+          }
+        }
+      }
+    }
+    const column = getPartyNameColumn('first') as any
+    mockGetIsRowRemoved.mockReturnValue(false)
+    mockGetTableBadges.mockReturnValue([])
+
+    const cell = column.cell({ row })
+
+    expect(cell.props.label).toBe('JANE SMITH')
+    const slot = cell.children['additional-label']()
+    expect(slot.length).toBe(1)
+    expect(slot[0].children[0].children).toBe('(Formerly JANE DOE)')
+    expect(slot[0].children[0].props.class).toBe('text-sm font-normal italic text-neutral')
+  })
+
+  it('does not render the former name when showFormerName is false', () => {
+    const row = {
+      original: {
+        new: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Smith'
+          },
+          actions: [ActionType.NAME_CHANGED]
+        },
+        old: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Doe'
+          }
+        }
+      }
+    }
+    const column = getPartyNameColumn('first', undefined, false) as any
+    mockGetIsRowRemoved.mockReturnValue(false)
+    mockGetTableBadges.mockReturnValue([])
+
+    const cell = column.cell({ row })
+    const slot = cell.children['additional-label']()
+    expect(slot.length).toBe(0)
+  })
+
+  it('renders both formerly name and preferred name when both apply', () => {
+    const row = {
+      original: {
+        new: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Smith',
+            preferredName: 'Jay'
+          },
+          actions: [ActionType.NAME_CHANGED]
+        },
+        old: {
+          name: {
+            partyType: PartyType.PERSON,
+            firstName: 'Jane',
+            middleName: '',
+            lastName: 'Doe'
+          }
+        }
+      }
+    }
+    const column = getPartyNameColumn('first', undefined, true) as any
+    mockGetIsRowRemoved.mockReturnValue(false)
+    mockGetTableBadges.mockReturnValue([])
+
+    const cell = column.cell({ row })
+
+    const slot = cell.children['additional-label']()
+    expect(slot.length).toBe(2)
+    expect(slot[0].children[0].children).toBe('(Formerly JANE DOE)')
+    expect(slot[1].children[0].children).toBe('Preferred Name:')
+  })
+
+  it('renders a BUSINESS name in uppercase', () => {
     const row = {
       original: {
         new: {
@@ -92,6 +204,7 @@ describe('getPartyNameColumn', () => {
     const cell = column.cell({ row })
 
     expect(cell.props.label).toBe('ACME CORP SERVICES')
+    expect(cell.props.icon).toBe('i-mdi-domain')
   })
 
   it('renders an empty string if businessName is missing', () => {
@@ -144,5 +257,48 @@ describe('getPartyNameColumn', () => {
 
     expect(cell.props.badges).toEqual(mockBadges)
     expect(mockGetTableBadges).toHaveBeenCalledWith(row, undefined)
+  })
+
+  it('adds a CEASED badge when all roles have ceased', () => {
+    const row = {
+      original: {
+        new: {
+          name: { partyType: PartyType.PERSON, firstName: 'John', middleName: '', lastName: 'Doe' },
+          roles: [{ roleType: RoleTypeUi.DIRECTOR, appointmentDate: '2020-12-22', cessationDate: '2022-12-08' }],
+          actions: []
+        }
+      }
+    }
+    const column = getPartyNameColumn() as any
+    mockGetIsRowRemoved.mockReturnValue(false)
+    mockGetTableBadges.mockReturnValue([])
+
+    const cell = column.cell({ row })
+
+    expect(cell.props.badges).toEqual([expect.objectContaining({ label: 'CEASED' })])
+    expect(cell.props.labelClass).toBe('opacity-55')
+    expect(cell.props.iconClass).toBe('opacity-55')
+  })
+
+  it('does not add a CEASED badge for active or removed parties', () => {
+    const column = getPartyNameColumn() as any
+    const getRow = (cessationDate: string | null, actions: ActionType[]) => ({
+      original: {
+        new: {
+          name: { partyType: PartyType.PERSON, firstName: 'John', middleName: '', lastName: 'Doe' },
+          roles: [{ roleType: RoleTypeUi.DIRECTOR, cessationDate }],
+          actions
+        }
+      }
+    })
+
+    mockGetIsRowRemoved.mockReturnValue(false)
+    mockGetTableBadges.mockReturnValue([])
+    expect(column.cell({ row: getRow(null, []) }).props.badges).toEqual([])
+
+    mockGetIsRowRemoved.mockReturnValue(true)
+    mockGetTableBadges.mockReturnValue([{ label: 'DELETED' }])
+    expect(column.cell({ row: getRow('2022-12-08', [ActionType.REMOVED]) }).props.badges)
+      .toEqual([{ label: 'DELETED' }])
   })
 })

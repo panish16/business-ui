@@ -48,6 +48,17 @@ describe('getTableBadges', () => {
     expect(result).toEqual([])
   })
 
+  it('should show the modified by staff badge only while the row has no action of its own', () => {
+    const untouched = { original: { modifiedByStaff: true, new: { actions: [] } } } as any
+    expect(getTableBadges(untouched).map(b => b.label)).toEqual(['MODIFIED BY STAFF'])
+
+    const removed = { original: { modifiedByStaff: true, new: { actions: [ActionType.REMOVED] } } } as any
+    expect(getTableBadges(removed).map(b => b.label)).toEqual(['DELETED'])
+
+    const edited = { original: { modifiedByStaff: true, new: { actions: [ActionType.NAME_CHANGED] } } } as any
+    expect(getTableBadges(edited).map(b => b.label)).toEqual(['NAME CHANGED'])
+  })
+
   it('should remove duplicate actions', () => {
     const actions = [ActionType.CHANGED, ActionType.CHANGED, ActionType.CHANGED]
     const row = { original: { new: { actions } } } as any
@@ -55,6 +66,20 @@ describe('getTableBadges', () => {
     const result = getTableBadges(row)
 
     expect(result).toHaveLength(1)
+  })
+
+  it('should only show a label once when several actions share it', () => {
+    const actions = [ActionType.NAME_CHANGED, ActionType.ADDRESS_CHANGED, ActionType.ROLES_CHANGED]
+    const row = { original: { new: { actions } } } as any
+    const overrides = {
+      [ActionType.NAME_CHANGED]: 'CORRECTED',
+      [ActionType.ADDRESS_CHANGED]: 'CORRECTED',
+      [ActionType.ROLES_CHANGED]: 'CORRECTED'
+    }
+
+    const result = getTableBadges(row, overrides)
+
+    expect(result.map(b => b.label)).toEqual(['CORRECTED'])
   })
 
   it('should filter out unknown action types', () => {
@@ -73,5 +98,13 @@ describe('getTableBadges', () => {
     const result = getTableBadges(row)
     expect(result).toHaveLength(1)
     expect(result[0]!.label).toBe('CORRECTED')
+  })
+})
+
+describe('DELETED_BADGE_CLASS', () => {
+  it('is the style getTableBadges uses for the DELETED badge', () => {
+    const row = { original: { new: { actions: [ActionType.REMOVED] } } } as never
+    expect(DELETED_BADGE_CLASS).toBe('bg-shade-secondary text-neutral-highlighted')
+    expect(getTableBadges(row)).toEqual([{ label: 'DELETED', class: DELETED_BADGE_CLASS }])
   })
 })

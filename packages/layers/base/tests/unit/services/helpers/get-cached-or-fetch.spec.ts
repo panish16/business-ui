@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getCachedOrFetch } from '../../../../app/services/helpers'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
@@ -24,7 +25,7 @@ describe('getCachedOrFetch', () => {
   const mockEntry = { key: ['test'], status: 'pending', meta: {} }
 
   beforeEach(() => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
     mocks.ensure.mockReturnValue(mockEntry)
   })
 
@@ -48,6 +49,17 @@ describe('getCachedOrFetch', () => {
     expect(mocks.fetch).toHaveBeenCalledWith(mockEntry)
     expect(mocks.refresh).not.toHaveBeenCalled()
     expect(result).toEqual({ id: 1, forced: true })
+  })
+
+  it('should join an in-flight request instead of fetching when force is true', async () => {
+    const refreshCall = Promise.resolve({ data: { id: 1, inFlight: true }, status: 'success' })
+    mocks.ensure.mockReturnValue({ ...mockEntry, pending: { refreshCall } })
+
+    const result = await getCachedOrFetch(mockOptions, true)
+
+    expect(mocks.fetch).not.toHaveBeenCalled()
+    expect(mocks.refresh).not.toHaveBeenCalled()
+    expect(result).toEqual({ id: 1, inFlight: true })
   })
 
   it('should propagate errors from the network call', async () => {

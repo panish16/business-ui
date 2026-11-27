@@ -1,0 +1,172 @@
+// NB: direct imports needed so that this util can be used in e2e tests
+import { ActionType } from '#business/app/enums/action-type'
+import { RoleType, RoleTypeUi } from '#business/app/enums/role-type'
+import { formatAddressApi, formatAddressUi, formatBaseAddressUi } from '#business/app/utils/formatters/format-address'
+
+const ROLE_RELATIONSHIPS: [RoleTypeUi, RoleType][] = [
+  [RoleTypeUi.APPLICANT, RoleType.APPLICANT],
+  [RoleTypeUi.COMPLETING_PARTY, RoleType.COMPLETING_PARTY],
+  [RoleTypeUi.CUSTODIAN, RoleType.CUSTODIAN],
+  [RoleTypeUi.DIRECTOR, RoleType.DIRECTOR],
+  [RoleTypeUi.INCORPORATOR, RoleType.INCORPORATOR],
+  [RoleTypeUi.LIQUIDATOR, RoleType.LIQUIDATOR],
+  [RoleTypeUi.OFFICER, RoleType.OFFICER],
+  [RoleTypeUi.PARTNER, RoleType.PARTNER],
+  [RoleTypeUi.PROPRIETOR, RoleType.PROPRIETOR],
+  [RoleTypeUi.RECEIVER, RoleType.RECEIVER],
+  // Officer class
+  [RoleTypeUi.CEO, RoleType.CEO],
+  [RoleTypeUi.CFO, RoleType.CFO],
+  [RoleTypeUi.PRESIDENT, RoleType.PRESIDENT],
+  [RoleTypeUi.VICE_PRESIDENT, RoleType.VICE_PRESIDENT],
+  [RoleTypeUi.CHAIR, RoleType.CHAIR],
+  [RoleTypeUi.TREASURER, RoleType.TREASURER],
+  [RoleTypeUi.SECRETARY, RoleType.SECRETARY],
+  [RoleTypeUi.ASSISTANT_SECRETARY, RoleType.ASSISTANT_SECRETARY],
+  [RoleTypeUi.OTHER, RoleType.OTHER]
+]
+
+export const UI_ROLE_TO_API_ROLE_MAP = Object.fromEntries(ROLE_RELATIONSHIPS)
+
+export const API_ROLE_TO_UI_ROLE_MAP = Object.fromEntries(
+  ROLE_RELATIONSHIPS.map(([uiValue, apiValue]) => [apiValue, uiValue])
+)
+
+function formatRelationshipRolesUi(roles: Role[]): PartyRoleSchema {
+  return roles.map((role) => {
+    if (!role.roleType || !API_ROLE_TO_UI_ROLE_MAP[role.roleType]) {
+      // Should never happen
+      console.error('No role type mapping for', role.roleType)
+    }
+    // FUTURE: remove this and below - needed for drafts due to schema being inconsistent with UI/API response mappings
+    // @ts-expect-error - special case due to ^
+    const convertedRole = role.roleType == 'CEO'
+      ? RoleTypeUi.CEO
+      // @ts-expect-error - special case due to ^^
+      : role.roleType == 'CFO'
+        ? RoleTypeUi.CFO
+        : API_ROLE_TO_UI_ROLE_MAP[role.roleType]!
+    return {
+      ...role,
+      roleType: convertedRole
+    }
+  })
+}
+
+export function formatRelationshipRolesApi(roles: PartyRoleSchema, isRemoved = false): Role[] {
+  return roles.map((role) => {
+    if (!role.roleType || !UI_ROLE_TO_API_ROLE_MAP[role.roleType]) {
+      // Should never happen
+      console.error('No role type mapping for', role.roleType)
+    }
+    const convertedRole = UI_ROLE_TO_API_ROLE_MAP[role.roleType]!
+    return {
+      ...role,
+      cessationDate: isRemoved && !role.cessationDate ? getToday() : role.cessationDate,
+      roleType: [RoleType.CEO, RoleType.CFO].includes(convertedRole)
+        // FUTURE - update schema so that we don't need to do this
+        ? convertedRole.toLocaleUpperCase() as RoleType
+        : convertedRole
+    }
+  })
+}
+
+export function formatPartyUi(party: OrgPerson, roleType?: RoleType): PartySchema {
+  const { mailingAddress, deliveryAddress, roles, officer } = party
+  const filteredRoles = roles?.filter(role => roleType ? role.roleType === roleType : true) || []
+  const id = officer.id ? String(officer.id) : crypto.randomUUID()
+  return {
+    id,
+    name: {
+      firstName: party.officer.firstName ?? '',
+      middleName: party.officer.middleInitial ?? '',
+      lastName: party.officer.lastName ?? '',
+      businessName: party.officer.organizationName ?? '',
+      partyType: party.officer.partyType || PartyType.PERSON,
+      hasPreferredName: !!party.officer.alternateName,
+      preferredName: party.officer.alternateName ?? ''
+    },
+    address: formatBaseAddressUi({ mailingAddress, deliveryAddress }),
+    roles: filteredRoles ? formatRelationshipRolesUi(filteredRoles) : [],
+    email: officer.email ?? '',
+    actions: [],
+    isEditing: false
+  }
+}
+
+export function formatRelationshipUi(party: BusinessRelationship): PartySchema {
+  const { mailingAddress, deliveryAddress } = party
+  const partyType = party.entity.businessName ? PartyType.ORGANIZATION : PartyType.PERSON
+  return {
+    // new parties have no identifier so generate a ui only id to identify the table row
+    id: party.entity.identifier || crypto.randomUUID(),
+    name: {
+      firstName: party.entity.givenName ?? '',
+      middleName: party.entity.middleInitial ?? '',
+      lastName: party.entity.familyName ?? '',
+      businessName: party.entity.businessName ?? '',
+      partyType,
+      hasPreferredName: !!party.entity.alternateName,
+      preferredName: party.entity.alternateName ?? ''
+    },
+    address: formatBaseAddressUi({ mailingAddress: mailingAddress!, deliveryAddress }),
+    roles: party.roles ? formatRelationshipRolesUi(party.roles) : [],
+    email: party.entity.email ?? '',
+    actions: party.actions ?? [],
+    isEditing: false
+  }
+}
+
+export function formatRelationshipApi(party: PartySchema): BusinessRelationship {
+  const mailingAddress = formatAddressApi(party.address.mailingAddress as ConnectAddress)
+  const deliveryAddress = formatAddressApi(party.address.deliveryAddress as ConnectAddress)
+  return {
+    entity: {
+      // the ui generates ids for new parties which must not be sent to the api
+      identifier: party.actions.includes(ActionType.ADDED) ? '' : party.id,
+      givenName: party.name.firstName ?? '',
+      middleInitial: party.name.middleName ?? '',
+      familyName: party.name.lastName ?? '',
+      businessName: party.name.businessName ?? '',
+      alternateName: party.name.preferredName ?? '',
+      ...(party.email ? { email: party.email } : {})
+    },
+    mailingAddress,
+    deliveryAddress,
+    roles: formatRelationshipRolesApi(party.roles, party.actions.includes(ActionType.REMOVED)),
+    actions: party.actions
+  }
+}
+
+/**
+ * Format a BusinessRelationship (from the API / draft) back into a CompletingPartySchema
+ * for populating the completing party form during draft resume.
+ */
+export function formatCompletingPartyRelationshipUi(relationship: BusinessRelationship): CompletingPartySchema {
+  return {
+    firstName: relationship.entity?.givenName ?? '',
+    middleName: relationship.entity?.middleInitial ?? '',
+    lastName: relationship.entity?.familyName ?? '',
+    mailingAddress: formatAddressUi(relationship.mailingAddress) as ConnectAddress
+  }
+}
+
+/**
+ * Format a CompletingPartySchema (from the completing party form) into a BusinessRelationship.
+ * This bridges the form schema to the relationship API format so completing party
+ * is submitted consistently with other party types (directors, receivers, etc.).
+ */
+export function formatCompletingPartyRelationshipApi(cp: CompletingPartySchema): BusinessRelationship {
+  const mailingAddress = formatAddressApi(cp.mailingAddress as ConnectAddress)
+  return {
+    entity: {
+      givenName: cp.firstName ?? '',
+      middleInitial: cp.middleName ?? '',
+      familyName: cp.lastName ?? ''
+    },
+    mailingAddress,
+    deliveryAddress: mailingAddress,
+    roles: [{ roleType: RoleType.COMPLETING_PARTY, appointmentDate: getToday() }],
+    actions: [ActionType.ADDED]
+  }
+}

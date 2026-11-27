@@ -7,4 +7,41 @@ export interface CourtOrder {
   orderDate?: string
   effectOfOrder?: string
   hasPlanOfArrangement?: boolean
+  orderText?: string
+  files?: unknown[]
+}
+
+export interface CourtOrderDoc {
+  fileName: string
+  fileKey: string
+  documentType: string
+  url: string
+}
+
+export interface CourtOrderResponse {
+  effectOfOrder: string | null
+  fileNumber: string
+  filingId: number
+  filingType: FilingType
+  id: number
+  orderDate?: string | null
+  orderDetails?: string | null
+  files?: CourtOrderDoc[]
+}
+
+export interface CourtOrderDocPayload {
+  fileName: string
+  fileKey: string
+  documentType: string
+}
+
+export interface CourtOrderPayload {
+  effectOfOrder: string | null
+  fileNumber: string
+  filingId: number
+  filingType: FilingType
+  id: number
+  orderDate?: string | null
+  orderDetails?: string | null
+  files?: CourtOrderDocPayload[]
 }

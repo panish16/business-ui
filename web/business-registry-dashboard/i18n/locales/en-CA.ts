@@ -311,34 +311,32 @@ export default {
       successToast: '{nrNum} was successfully added to your table.'
     },
     manageBusiness: {
-      heading: 'Access and manage a B.C. Business',
-      headingRequestAccess: 'Request access to business',
-      businessName: '{boldStart}Business Name:{boldEnd} {name}',
-      businessIdentifier: {
-        default: '{boldStart}Incorporation Number:{boldEnd} {number}',
-        firm: '{boldStart}Registration Number:{boldEnd} {number}'
-      },
-      expiredLink: '{boldStart}Important:{boldEnd} The business could not be added to your account due to an expired link or an error. Please send the request again below.',
+      heading: 'Access and manage a {subject}',
+      headingRequestAccess: 'Request access to {subject}',
+      name: '{boldStart}Name:{boldEnd} {name}',
+      number: '{boldStart}Number:{boldEnd} {number}',
+      expiredLink: '{boldStart}Important:{boldEnd} The {subject} could not be added to your account due to an expired link or an error. Please send the request again below.',
+      colinBusinessAlert: '{boldStart}Important:{boldEnd} {name} has not been migrated to the new BC Business Registry. You can only use the company here for an Amalgamation; all other Business Registry actions must be performed at {linkStart}Corporate Online{linkEnd}.',
       missingInfo: {
-        p1: 'Some required information for this business is missing.',
-        fragmentPrt1: 'The business doesn\'t have an email on file. You can download and submit this',
+        p1: 'Some required information for this {subject} is missing.',
+        fragmentPrt1: 'The {subject} doesn\'t have an email on file. You can download and submit this',
         fragmentPrt2: 'form',
-        fragmentPrt3: 'to add an email to this business'
+        fragmentPrt3: 'to add an email to this {subject}'
       },
-      legend: 'You must be authorized to manage this business.',
-      legendMultiple: 'You must be authorized to manage this business. You can be authorized in one of the following ways:',
+      legend: 'You must be authorized to manage this {subject}.',
+      legendMultiple: 'You must be authorized to manage this {subject}. You can be authorized in one of the following ways:',
       chooseOption: 'Choose one of the options below:',
       authOption: {
         passcode: {
           radioLabel: {
-            default: 'Use the company password',
-            coopOrBen: 'Use the company password'
+            default: 'Use the {subject} password',
+            coopOrBen: 'Use the {subject} passcode'
           },
           fields: {
             passcode: {
               arialabel: {
-                coop: 'Enter the company password',
-                default: 'Enter the company password'
+                coop: 'Enter the {subject} passcode',
+                default: 'Enter the {subject} password'
               },
               placeholder: {
                 coop: 'Passcode',
@@ -379,7 +377,7 @@ export default {
               }
             },
             certify: {
-              label: '{boldStart}{name}{boldEnd} certifies that they have relevant knowledge of the registered entity and is authorized to act on behalf of this business.',
+              label: '{boldStart}{name}{boldEnd} certifies that they have relevant knowledge of the registered entity and is authorized to act on behalf of this {subject}.',
               error: 'Please certify in order to continue'
             }
           }
@@ -387,23 +385,23 @@ export default {
         email: {
           radioLabel: {
             default: 'Confirm authorization using your email address',
-            firm: 'Confirm authorization using your business email address',
+            firm: 'Confirm authorization using your {subject} email address',
             corpOrBenOrCoop: 'Confirm authorization using your registered office email address',
             coop: 'Confirm authorization using your registered office email address',
-            safAffiliation: 'Use your registered office email address to send a link to your inbox'
+            safAffiliation: 'Send a link to the registered office email address'
           },
-          coopSubtext: '(If you forgot or don\'t have a company password)',
+          coopSubtext: '(If you forgot or don\'t have a {subject} password)',
           sentTo: {
-            default: 'An email will be sent to the contact email of the business:',
-            firm: 'An email will be sent to the business contact email of the business:',
-            corpOrBenOrCoop: 'An email will be sent to the registered office contact email of the business:'
+            default: 'An email will be sent to the contact email of the {subject}:',
+            firm: 'An email will be sent to the contact email of the {subject}:',
+            corpOrBenOrCoop: 'An email will be sent to the registered office contact email of the {subject}:'
           },
-          instructions: 'Click on the link in the email to add this business. The link will be valid for 12 hours.',
+          instructions: 'Click on the link in the email to add this {subject}. The link will be valid for 12 hours.',
           update: 'To update this email, download and submit this'
         },
         delegation: {
           radioLabel: {
-            default: 'Request authorization from an account managing this business'
+            default: 'Request authorization from an account managing this {subject}'
           },
           fields: {
             account: {
@@ -424,7 +422,7 @@ export default {
       emailSent: {
         heading: 'Authorization Email Sent',
         p1: 'An email was sent to {boldStart}{email}{boldEnd}',
-        p2: 'Confirm your access by clicking the link in this email. This will add the business to your Business Registry List. The link is valid for 12 hours.'
+        p2: 'Confirm your access by clicking the link in this email. This will add the {subject} to your Business Registry List. The link is valid for 12 hours.'
       },
       toast: {
         success: '{identifier} was successfully added to your table.',
@@ -443,20 +441,20 @@ export default {
           401: {
             coop: {
               title: 'Invalid Passcode',
-              description: 'Unable to add the business. The provided password is invalid. Please try again or use one of the other options available if you can no longer remember your password or don’t have access to it.'
+              description: 'Unable to add the {subject}. The provided password is invalid. Please try again or use one of the other options available if you can no longer remember your password or don’t have access to it.'
             },
             default: {
               title: 'Invalid Password',
-              description: 'Unable to add the business. The provided password is invalid. Please try again or use one of the other options available if you can no longer remember your password or don’t have access to it.'
+              description: 'Unable to add the {subject}. The provided password is invalid. Please try again or use one of the other options available if you can no longer remember your password or don’t have access to it.'
             }
           },
           404: {
-            title: 'Business Not Found',
-            description: 'The specified business was not found.'
+            title: '{subject} Not Found',
+            description: 'The specified {subject} was not found.'
           },
           400: {
-            title: 'Business Already Added',
-            description: 'The business {name} with the business number {identifier} is already in your Business Registry List.'
+            title: '{subject} Already Added',
+            description: 'The {subject} {name} with the {subject} number {identifier} is already in your Business Registry List.'
           },
           406: {
             title: 'Passcode Already Claimed',
@@ -470,15 +468,15 @@ export default {
         firm: {
           401: {
             title: 'Invalid Proprietor or Partner Name (e.g., Last Name, First Name, Middle Name)',
-            description: 'Unable to add the business. The provided proprietor or partner name (e.g., last name, first name, middle name) is invalid.'
+            description: 'Unable to add the {subject}. The provided proprietor or partner name (e.g., last name, first name, middle name) is invalid.'
           },
           404: {
-            title: 'Business Not Found',
-            description: 'The specified business was not found.'
+            title: '{subject} Not Found',
+            description: 'The specified {subject} was not found.'
           },
           400: {
-            title: 'Business Already Added',
-            description: 'The business {name} with the business number {identifier} is already in your Business Registry List.'
+            title: '{subject} Already Added',
+            description: 'The {subject} {name} with the {subject} number {identifier} is already in your Business Registry List.'
           },
           default: {
             title: 'Something Went Wrong',
@@ -486,12 +484,12 @@ export default {
           }
         }
       },
-      submitBtn: 'Manage this Business',
+      submitBtn: 'Manage this {subject}',
       noOptionAlert: 'Please select an option from the list above',
       safAffiliationAlert: { // only used when the simplified account flow + affiliation fails
-        expired: '{boldStart}Important:{boldEnd} The business could not be added to your account due to an expired link. Please select an option below to send a new request.',
+        expired: '{boldStart}Important:{boldEnd} The {subject} could not be added to your account due to an expired link. Please select an option below to send a new request.',
         actioned: '{boldStart}Important:{boldEnd} This link is no longer active as it has already been processed. Please select an option below to send a new request.',
-        generic: '{boldStart}Important:{boldEnd} The business could not be added to your account due to an internal error. Please select an option below to send a new request.'
+        generic: '{boldStart}Important:{boldEnd} The {subject} could not be added to your account due to an internal error. Please select an option below to send a new request.'
       }
     }
   },
@@ -580,6 +578,7 @@ export default {
     manageBusiness: 'Manage Business',
     cancelRequest: 'Cancel Request',
     amalgamateNowShortForm: 'Amalgamate Now (Short Form)',
+    viewAccess: 'View Access',
     noAffiliationRecords: {
       line1: 'You don\'t have any businesses listed.',
       line2: 'Retrieve an existing business or active Name Request from the search box above.'
@@ -605,6 +604,9 @@ export default {
         'Manage this business right away, or find it in your business list any time.',
         'Bookmark this page to access your business in the future.'
       ],
+      important: 'Important:',
+      migrationWarning: 'Please review your migrated {name} information and change any errors that have occurred during the move.',
+      reviewNow: 'Review now',
       manageBusiness: 'Manage Business'
     },
     removeBusiness: {
@@ -746,6 +748,8 @@ export default {
   words: {
     i: 'I',
     addresses: 'Addresses',
+    business: 'business',
+    company: 'company',
     directors: 'Directors',
     confirm: 'Confirm',
     select: 'Select',
@@ -797,6 +801,11 @@ export default {
     },
     help: {
       title: 'Annual Report Overview - Service BC Annual Report'
+    },
+    viewAccess: {
+      title: 'View Access - My Business Registry',
+      h1: 'View Access',
+      intro: 'List of BC Registries accounts that have access to view and manage this business.'
     }
   },
   search: {
@@ -818,6 +827,15 @@ export default {
     }
   },
   table: {
+    authorizedAccounts: {
+      title: 'Authorized Accounts ({count})',
+      columns: {
+        accountName: 'Account Name',
+        dateAdded: 'Date Added'
+      },
+      empty: 'No accounts have access to this business.',
+      error: 'We were unable to load the accounts that have access to this business. Please try again later.'
+    },
     affiliation: {
       filter: {
         busName: {

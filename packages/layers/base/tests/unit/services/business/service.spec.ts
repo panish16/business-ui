@@ -1,16 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+import { mockBusinessApi } from '../../setup'
 
 const mockQuery = {
   addressesOptions: vi.fn(),
   authorizedActionsOptions: vi.fn(),
   businessOptions: vi.fn(),
+  businessExtOptions: vi.fn(),
   bootstrapFilingOptions: vi.fn(),
+  courtOrdersOptions: vi.fn(),
   documentOptions: vi.fn(),
   filingOptions: vi.fn(),
+  filingChangesOptions: vi.fn(),
   filingCommentsOptions: vi.fn(),
   filingDocumentUrlsOptions: vi.fn(),
+  filingValidateSectionOptions: vi.fn(),
   ledgerOptions: vi.fn(),
   linkedNameRequestOptions: vi.fn(),
   partiesOptions: vi.fn(),
@@ -29,27 +34,24 @@ vi.mock('~/services/helpers', () => ({
 }))
 mockNuxtImport('isValidDraft', () => mockIsValidDraft)
 
-const mockBusinessApi = vi.fn()
-mockNuxtImport('useNuxtApp', () => () => ({
-  $businessApi: mockBusinessApi,
-  $i18n: { t: (k: string) => k }
-}))
+mockNuxtImport('useConnectAccountStore', () => () => ({ currentAccount: { id: 123456 } }))
 
 describe('useBusinessService', () => {
-  const service = useBusinessService()
+  let service: ReturnType<typeof useBusinessService>
   const businessId = 'BC1234567'
 
   beforeEach(() => {
     vi.clearAllMocks()
+    service = useBusinessService()
   })
 
   it('getAddresses should fetch options and call the cache helper', async () => {
     const mockData = { street: '123 Main' }
     mockGetCachedOrFetch.mockResolvedValue(mockData)
 
-    const result = await service.getAddresses(businessId, true)
+    const result = await service.getAddresses(businessId, undefined, true)
     const opts = mockQuery.addressesOptions
-    expect(opts).toHaveBeenCalledWith(businessId)
+    expect(opts).toHaveBeenCalledWith(businessId, undefined)
     expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), true)
     expect(result).toEqual(mockData)
   })
@@ -96,6 +98,19 @@ describe('useBusinessService', () => {
     expect(result).toEqual(mockData.business)
   })
 
+  // FUTURE - properly type getBusinessExtended with TS overloads
+  it.skip('getBusinessExtended should fetch options and call the cache helper', async () => {
+    // const mockData = { amalgamation: { someData: true } }
+    // mockGetCachedOrFetch.mockResolvedValue(mockData)
+
+    // const result = await service.getBusinessExtended(businessId, true, FilingType.ALTERATION)
+
+    // const opts = mockQuery.businessExtOptions
+    // expect(opts).toHaveBeenCalledWith(businessId, true, FilingType.ALTERATION)
+    // expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), false)
+    // expect(result).toEqual(mockData.amalgamation)
+  })
+
   it('getBootstrapFiling should fetch options and call the cache helper', async () => {
     // returns undefined for a non-temp id
     const realIdentifierResult = await service.getBootstrapFiling('BC1234567')
@@ -112,6 +127,18 @@ describe('useBusinessService', () => {
     expect(opts).toHaveBeenCalledWith(tempId)
     expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), false)
     expect(tempIdResult).toEqual(mockData)
+  })
+
+  it('getCourtOrders should fetch options and call the cache helper', async () => {
+    const mockData = { courtOrders: [] }
+    mockGetCachedOrFetch.mockResolvedValue(mockData)
+
+    const result = await service.getCourtOrders(businessId, false)
+
+    const opts = mockQuery.courtOrdersOptions
+    expect(opts).toHaveBeenCalledWith(businessId)
+    expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), false)
+    expect(result).toEqual(mockData.courtOrders)
   })
 
   it('getDocument should fetch options and call the cache helper', async () => {
@@ -132,11 +159,35 @@ describe('useBusinessService', () => {
     mockGetCachedOrFetch.mockResolvedValue(mockData)
     const filingId = 123
 
-    const result = await service.getFiling(businessId, filingId, true)
+    const result = await service.getFiling(businessId, filingId, false, true)
     const opts = mockQuery.filingOptions
-    expect(opts).toHaveBeenCalledWith(businessId, filingId)
+    expect(opts).toHaveBeenCalledWith(businessId, filingId, false)
     expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), true)
     expect(result).toEqual(mockData)
+  })
+
+  it('getFiling should pass publicData through to the query options', async () => {
+    const mockData = { filing: { header: { name: 'dissolution' } } }
+    mockGetCachedOrFetch.mockResolvedValue(mockData)
+
+    const result = await service.getFiling(businessId, 123, true)
+    expect(mockQuery.filingOptions).toHaveBeenCalledWith(businessId, 123, true)
+    expect(mockGetCachedOrFetch).toHaveBeenCalledWith(mockQuery.filingOptions(), false)
+    expect(result).toEqual(mockData)
+  })
+
+  it('getFilingChanges should fetch fresh by default', async () => {
+    const mockData = { upToDate: true, conflicts: [] }
+    mockGetCachedOrFetch.mockResolvedValue(mockData)
+
+    const result = await service.getFilingChanges(businessId, 55)
+    const opts = mockQuery.filingChangesOptions
+    expect(opts).toHaveBeenCalledWith(businessId, 55)
+    expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), true)
+    expect(result).toEqual(mockData)
+
+    await service.getFilingChanges(businessId, 55, false)
+    expect(mockGetCachedOrFetch).toHaveBeenLastCalledWith(opts(), false)
   })
 
   it('getFilingComments should fetch options and call the cache helper', async () => {
@@ -235,12 +286,64 @@ describe('useBusinessService', () => {
     const mockData = { parties: ['party1', 'party2', 'party3'] }
     mockGetCachedOrFetch.mockResolvedValue(mockData)
 
-    const query = { role: 'director' }
+    const query = { role: RoleType.DIRECTOR }
     const result = await service.getParties(businessId, query, true)
     const opts = mockQuery.partiesOptions
     expect(opts).toHaveBeenCalledWith(businessId, query)
     expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), true)
     expect(result).toEqual(mockData.parties)
+  })
+
+  it('deleteDocument should call the correct endpoint with DELETE', async () => {
+    const mockFileKey = 'CORP-DS0100001003'
+    const mockResponse = { success: true }
+
+    mockBusinessApi.mockResolvedValue(mockResponse)
+
+    const result = await service.deleteDocument(mockFileKey)
+
+    expect(mockBusinessApi).toHaveBeenCalledOnce()
+
+    const callArgs = mockBusinessApi.mock.calls[0]!
+    const calledUrl = callArgs[0]
+    const calledOptions = callArgs[1]
+
+    expect(calledUrl).toBe(`documents/client/${mockFileKey}`)
+    expect(calledOptions.method).toBe('DELETE')
+    expect(result).toEqual(mockResponse)
+  })
+
+  it('postDocument should call the correct endpoint with POST and FormData payload', async () => {
+    const mockFile = new File(['test content'], 'test.pdf', { type: 'application/pdf' })
+    const mockResponse = { documentServiceId: 'DS1234567890' }
+
+    mockBusinessApi.mockResolvedValue(mockResponse)
+
+    const result = await service.postDocument(
+      mockFile,
+      {
+        identifier: businessId,
+        filingType: FilingType.CORRECTION,
+        entityType: CorpTypeCd.BC_COMPANY,
+        documentType: DocumentTypeClient.COURT_ORDER
+      }
+    )
+
+    expect(mockBusinessApi).toHaveBeenCalledOnce()
+
+    const callArgs = mockBusinessApi.mock.calls[0]!
+    const calledUrl = callArgs[0]
+    const calledOptions = callArgs[1]
+    expect(calledUrl).toBe(`documents/client/${FilingType.CORRECTION}/BC/court_order`)
+    expect(calledOptions.method).toBe('POST')
+    expect(calledOptions.query).toEqual({
+      businessIdentifier: 'BC1234567',
+      filename: 'test.pdf',
+      filingId: undefined
+    })
+
+    expect(calledOptions.body).toBeDefined()
+    expect(result).toEqual(mockResponse)
   })
 
   describe('postFiling', () => {
@@ -278,7 +381,6 @@ describe('useBusinessService', () => {
         })
       )
 
-      // @ts-expect-error - mockBusinessApi.mock.calls may be undefined
       const sentBody = mockBusinessApi.mock.calls[0][1].body
       expect(sentBody.filing.header.name).toBe('changeOfOfficers')
       expect(sentBody.filing.business.identifier).toBe('BC123')
@@ -340,6 +442,40 @@ describe('useBusinessService', () => {
       )
     })
 
+    it('should add the base transaction id to a PUT only', async () => {
+      const filingId = 999
+      mockBusinessApi.mockResolvedValue({ filing: {} })
+
+      await service.saveOrUpdateDraftFiling(business.identifier, payload, false, filingId, { baseTransactionId: 12 })
+      expect(mockBusinessApi).toHaveBeenLastCalledWith(
+        `businesses/${business.identifier}/filings/${filingId}`,
+        expect.objectContaining({ method: 'PUT', query: { draft: true, baseTransactionId: 12 } })
+      )
+
+      await service.saveOrUpdateDraftFiling(business.identifier, payload, true, filingId, { baseTransactionId: 12 })
+      expect(mockBusinessApi).toHaveBeenLastCalledWith(
+        `businesses/${business.identifier}/filings/${filingId}`,
+        expect.objectContaining({ method: 'PUT', query: { baseTransactionId: 12 } })
+      )
+
+      await service.saveOrUpdateDraftFiling(business.identifier, payload, false, undefined, { baseTransactionId: 12 })
+      expect(mockBusinessApi).toHaveBeenLastCalledWith(
+        `businesses/${business.identifier}/filings`,
+        expect.objectContaining({ method: 'POST', query: { draft: true } })
+      )
+    })
+
+    it('should pass custom headers through', async () => {
+      mockBusinessApi.mockResolvedValue({ filing: {} })
+
+      await service.saveOrUpdateDraftFiling(business.identifier, payload, false, 999, { headers: { 'x-test': '1' } })
+
+      expect(mockBusinessApi).toHaveBeenLastCalledWith(
+        `businesses/${business.identifier}/filings/999`,
+        expect.objectContaining({ headers: { 'x-test': '1' } })
+      )
+    })
+
     it('should submit a final filing (not a draft) when isSubmission is true', async () => {
       mockBusinessApi.mockResolvedValue({ filing: {} })
 
@@ -360,7 +496,6 @@ describe('useBusinessService', () => {
 
       await service.saveOrUpdateDraftFiling(business.identifier, payload, false)
 
-      // @ts-expect-error - mockBusinessApi.mock.calls may be undefined
       const sentBody = mockBusinessApi.mock.calls[0][1].body
       expect(sentBody.filing.header.name).toBe('changeOfOfficers')
       expect(sentBody.filing.business.identifier).toBe('BC123')
@@ -380,6 +515,24 @@ describe('useBusinessService', () => {
         `businesses/${businessId}/filings/${filingId}`,
         { method: 'DELETE' }
       )
+    })
+  })
+
+  describe('validateFilingSection', () => {
+    it('should call the correct endpoint with the POST method', async () => {
+      const businessId = 'BC123'
+      const validatePayload = {
+        filingType: FilingType.CORRECTION,
+        section: 'nameRequest',
+        data: { legalName: 'Test Name LTD' },
+        filingSubType: FilingSubType.AMEND_RECEIVER
+      }
+
+      await service.validateFilingSection(businessId, validatePayload)
+      const opts = mockQuery.filingValidateSectionOptions
+
+      expect(opts).toHaveBeenCalledWith(businessId, validatePayload)
+      expect(mockGetCachedOrFetch).toHaveBeenCalledWith(opts(), false)
     })
   })
 })

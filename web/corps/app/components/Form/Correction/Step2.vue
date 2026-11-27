@@ -9,46 +9,28 @@ const businessStore = useBusinessStore()
 const { business, businessContact } = storeToRefs(businessStore)
 const staffPayFormRef = useTemplateRef<StaffPaymentFieldsetRef>('staff-pay-ref')
 const partyColumns: TablePartyColumnName[] = ['name', 'mailing', 'delivery', 'effectiveDates']
+const custodianColumns: TablePartyColumnName[] = ['name', 'mailing', 'delivery', 'email']
 
-/**
- * Change detection for review sections.
- *
- * These check the `actions` array on each table entry rather than comparing
- * current vs initial snapshots. This is necessary because when resuming a
- * saved draft, the initial snapshot IS the merged (draft + original) state,
- * so initial === current. The `actions` array (e.g. ["ADDRESS_CHANGED"],
- * ["CORRECTED"]) is the reliable indicator that a correction change exists.
- */
-
-/** Whether any offices were changed */
-const hasOfficeChanges = computed(() => {
-  return store.offices.some(o => o.new.actions?.length > 0)
-})
-
-/** Whether any directors were changed */
-const hasDirectorChanges = computed(() => {
-  return store.directors.some(d => d.new.actions.length > 0)
-})
-
-/** Whether any share classes were changed */
-const hasShareStructureChanges = computed(() => {
-  return store.shareClasses.some(sc => sc.new.actions.length > 0)
-})
-
-/** Whether any receivers were changed */
-const hasReceiverChanges = computed(() => {
-  return store.receivers.some(r => r.new.actions.length > 0)
-})
-
-/** Whether any liquidators were changed */
-const hasLiquidatorChanges = computed(() => {
-  return store.liquidators.some(l => l.new.actions.length > 0)
-})
+const {
+  hasDirectorChange,
+  hasReceiverChange,
+  hasLiquidatorChange,
+  hasCustodianChange,
+  hasOfficeChange,
+  hasShareStructureChange,
+  hasCourtOrderChange,
+  hasAmalgamationChange
+} = useCorrectionHelper()
 
 const requiresAuthorization = computed(() => {
   const legalType = businessStore.business?.legalType as CorpTypeCd | undefined
   return legalType ? CORPS.includes(legalType) : false
 })
+
+const yourCompanyFieldOverrides = computed(() => getYourCompanyFieldOverrides(
+  store.correctedFilingType,
+  store.correctedFilingSubType as FilingSubType
+))
 
 function onError(event: FormErrorEvent) {
   const firstError = event?.errors?.[0]
@@ -79,18 +61,19 @@ function onError(event: FormErrorEvent) {
         <p>{{ $t('text.correctionReviewDescription') }}</p>
       </div>
 
-      <!-- Company Name (readonly, always displayed) -->
-      <ManageCompanyName
+      <!-- Your Company (readonly, always displayed) -->
+      <ManageYourCompany
         :loading="store.initializing"
         :business
         :contact="businessContact"
+        :field-overrides="yourCompanyFieldOverrides"
         variant="correct-readonly"
       />
 
       <!-- Office Addresses (readonly, only if changed) -->
       <!-- Section 2: Office Addresses -->
       <ManageOffices
-        v-if="hasOfficeChanges"
+        v-if="hasOfficeChange"
         data-testid="review-office-addresses-section"
         :loading="store.initializing"
         :empty-text="$t('label.noOffices')"
@@ -100,45 +83,76 @@ function onError(event: FormErrorEvent) {
 
       <!-- Directors (readonly, only if changed) -->
       <ManageParties
-        v-if="hasDirectorChanges"
+        v-if="hasDirectorChange"
         :loading="store.initializing"
         :empty-text="$t('label.noDirectors')"
-        :table-title="$t('label.currentDirectors')"
+        :table-title="$t('label.directors')"
         :columns-to-display="partyColumns"
         data-testid="review-current-directors-section"
+        :role-type="RoleTypeUi.DIRECTOR"
         variant="correct-readonly"
+        state-key="manage-directors"
       />
 
       <!-- Receivers (readonly, only if changed) -->
       <ManageParties
-        v-if="hasReceiverChanges"
+        v-if="hasReceiverChange"
         :loading="store.initializing"
         :empty-text="$t('label.noReceivers')"
-        :table-title="$t('label.currentReceivers')"
+        :table-title="$t('label.receivers')"
         :columns-to-display="partyColumns"
         data-testid="review-receivers-section"
+        :role-type="RoleTypeUi.RECEIVER"
         variant="correct-readonly"
         state-key="manage-receivers"
       />
 
       <!-- Liquidators (readonly, only if changed) -->
       <ManageParties
-        v-if="hasLiquidatorChanges"
+        v-if="hasLiquidatorChange"
         state-key="manage-liquidators"
         :loading="store.initializing"
         :empty-text="$t('label.noLiquidators')"
-        :table-title="$t('label.currentLiquidators')"
+        :table-title="$t('label.liquidators')"
         :columns-to-display="partyColumns"
         data-testid="review-liquidators-section"
+        :role-type="RoleTypeUi.LIQUIDATOR"
+        variant="correct-readonly"
+      />
+
+      <!-- Custodians (readonly, only if changed) -->
+      <ManageParties
+        v-if="hasCustodianChange"
+        state-key="manage-custodians"
+        :loading="store.initializing"
+        :empty-text="$t('label.noCustodians')"
+        :table-title="$t('label.custodians')"
+        :columns-to-display="custodianColumns"
+        data-testid="review-custodians-section"
+        :role-type="RoleTypeUi.CUSTODIAN"
         variant="correct-readonly"
       />
 
       <!-- Share Structure (readonly, only if changed) -->
       <ManageShareStructure
-        v-if="hasShareStructureChanges"
+        v-if="hasShareStructureChange"
         data-testid="review-share-structure-section"
         :loading="store.initializing"
         :empty-text="$t('label.noShareClasses')"
+        variant="correct-readonly"
+      />
+
+      <ManageCourtOrders
+        v-if="hasCourtOrderChange"
+        data-testid="review-court-orders-section"
+        :loading="store.initializing"
+        variant="correct-readonly"
+      />
+
+      <ManageAmalgamation
+        v-if="hasAmalgamationChange && store.correctedFilingType === FilingType.AMALGAMATION_APPLICATION"
+        data-testid="review-amalgamation-section"
+        :loading="store.initializing"
         variant="correct-readonly"
       />
     </section>
@@ -176,7 +190,7 @@ function onError(event: FormErrorEvent) {
     <FormCertify
       v-if="!store.isStaffCorrectionType && store.formState.certify"
       v-model="store.formState.certify"
-      :entity-type="getLegalTypeDescription(businessStore.business?.legalType)"
+      :entity-type="getCorpFullDescription(businessStore.business?.legalType, businessStore.business?.legalType)"
       order="5"
       name="certify"
     />
@@ -184,7 +198,7 @@ function onError(event: FormErrorEvent) {
     <FormConfirmAuthorization
       v-if="requiresAuthorization && store.formState.authorization"
       v-model="store.formState.authorization"
-      :entity-type="getLegalTypeDescription(businessStore.business?.legalType)"
+      :entity-type="getCorpFullDescription(businessStore.business?.legalType, businessStore.business?.legalType)"
       :order="store.isStaffCorrectionType ? 4 : 6"
       name="authorization"
     />

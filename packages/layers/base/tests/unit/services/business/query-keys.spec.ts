@@ -14,6 +14,13 @@ mockNuxtImport('storeToRefs', () => {
   return (store: any) => store
 })
 
+const validateKeyPayload = {
+  filingType: FilingType.CORRECTION,
+  section: 'nameRequest',
+  data: { legalName: 'Test Name LTD' },
+  filingSubType: FilingSubType.AMEND_RECEIVER
+}
+
 describe('useBusinessQueryKeys', () => {
   beforeEach(() => {
     mockCurrentAccount.value = { id: 'ACC123' }
@@ -27,12 +34,12 @@ describe('useBusinessQueryKeys', () => {
   it('should be reactive when the account ID changes', async () => {
     const { base, keys } = useBusinessQueryKeys()
     expect(base.value).toEqual(['business', 'ACC123'])
-    expect(keys.addresses('BC111')).toEqual(['business', 'ACC123', 'BC111', 'addresses'])
+    expect(keys.addresses('BC111')).toEqual(['business', 'ACC123', 'BC111', 'addresses', {}])
 
     mockCurrentAccount.value = { id: 'ACC-NEW' }
 
     expect(base.value).toEqual(['business', 'ACC-NEW'])
-    expect(keys.addresses('BC111')).toEqual(['business', 'ACC-NEW', 'BC111', 'addresses'])
+    expect(keys.addresses('BC111')).toEqual(['business', 'ACC-NEW', 'BC111', 'addresses', {}])
   })
 
   describe('Key Structure', () => {
@@ -41,15 +48,21 @@ describe('useBusinessQueryKeys', () => {
     const accountId = 'ACC123'
 
     it.each([
-      ['addresses', [businessId], ['business', accountId, businessId, 'addresses']],
+      ['addresses', [businessId], ['business', accountId, businessId, 'addresses', {}]],
+      ['addresses', [businessId, { date: '2026-01-13' }], ['business', accountId, businessId, 'addresses', { date: '2026-01-13' }]],
       ['authInfo', [businessId], ['business', accountId, businessId, 'auth-info']],
       ['authorizedActions', [businessId], ['business', accountId, businessId, 'authorized-actions']],
       ['business', [businessId, true], ['business', accountId, businessId, 'information', { slim: true, publicData: undefined }]],
+      ['businessExt', [businessId, true], ['business', accountId, businessId, 'information-ext', { forCorrection: true, filingType: undefined }]],
       ['bootstrapFiling', ['T12345'], ['business', accountId, 'T12345', 'bootstrap-filing']],
+      ['courtOrders', [businessId], ['business', accountId, businessId, 'court-orders']],
       ['document', ['http://api/pdf'], ['business', accountId, 'document', { url: 'http://api/pdf' }]],
-      ['filing', [businessId, 55], ['business', accountId, businessId, 'filing', 55]],
+      ['filing', [businessId, 55], ['business', accountId, businessId, 'filing', 55, { publicData: false }]],
+      ['filing', [businessId, 55, true], ['business', accountId, businessId, 'filing', 55, { publicData: true }]],
+      ['filingChanges', [businessId, 55], ['business', accountId, businessId, 'filing', 55, 'changes']],
       ['filingComments', ['http://comments'], ['business', accountId, 'filing', 'comments', { url: 'http://comments' }]],
       ['filingDocumentUrls', [businessId, 55], ['business', accountId, businessId, 'filing', 55, 'document-urls']],
+      ['filingValidateSection', [businessId, validateKeyPayload], ['business', accountId, businessId, 'filing', 'validate', 'section', validateKeyPayload]],
       ['ledger', [businessId, '2026-01-13'], ['business', accountId, businessId, 'ledger', { date: '2026-01-13' }]],
       ['linkedNameRequest', ['NR 123'], ['business', accountId, 'linked-name-request', 'NR 123']],
       ['parties', [businessId, { role: 'director' }], ['business', accountId, businessId, 'parties', { role: 'director' }]],

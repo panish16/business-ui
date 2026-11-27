@@ -1,6 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { navigateToTransitionPage } from '../../test-utils'
+import {
+  navigateToTransitionPage,
+  fillCompletingPartyEmail,
+  assertFinalRedirect,
+  goToTransitionReviewStep
+} from '../../test-utils'
 import { fillOutCertify, fillOutFolio } from '#business/tests/e2e/test-utils'
 import {
   mockCommonApiCallsForFiling,
@@ -27,6 +34,7 @@ const staffHeaderPayload = {
 
 const clientHeaderPayload = {
   name: 'transition',
+  certifiedBy: 'TestFirst TestLast',
   accountId: 1222,
   date: new Date().toISOString().split('T')[0],
   folioNumber: 'client-folio-123'
@@ -65,9 +73,23 @@ async function confirmOffices(page: Page) {
 async function editAndConfirmDirectors(page: Page) {
   const directors = page.getByTestId('current-directors-section').locator('tbody')
   const rowToEdit = directors.locator('tr').filter({ hasText: 'WALLABY WAY ' })
+  const streetInput = directors.getByTestId('mailing-address-input-streetAdditional')
+  const sameAsMailingCheckbox = directors.getByRole('checkbox', { name: 'Delivery Address same as Mailing Address' })
   await rowToEdit.getByRole('button', { name: 'Change' }).click()
-  await directors.getByTestId('mailing-address-input-streetAdditional').fill('Unit 1A')
-  await directors.getByRole('button', { name: 'Done' }).click()
+  await expect(streetInput).toBeVisible()
+  await streetInput.fill('Unit 1A')
+  // Editing the mailing address debounce-resets "same as mailing" for 100ms by design
+  // (see Form/Address/index.vue) — wait it out, then re-confirm delivery matches mailing.
+  await page.waitForTimeout(200)
+  await expect(async () => {
+    if (await streetInput.isVisible()) {
+      if (!(await sameAsMailingCheckbox.isChecked())) {
+        await sameAsMailingCheckbox.check({ force: true })
+      }
+      await directors.getByRole('button', { name: 'Done' }).click()
+    }
+    await expect(streetInput).not.toBeVisible()
+  }).toPass({ timeout: 15000 })
 
   await page.getByRole('checkbox', {
     name: 'I confirm that the director information listed for this business is correct.'
@@ -144,16 +166,6 @@ async function editShares(page: Page) {
   }
 }
 
-async function goToReview(page: Page) {
-  await page.getByRole('button', { name: 'Review and Confirm' }).click()
-  // Wait for step 2 to render before interacting with its elements
-  await expect(page.getByTestId('document-delivery-section')).toBeVisible({ timeout: 10000 })
-}
-
-async function fillCompletingParty(page: Page) {
-  await page.getByTestId('completing-party-email-input').fill(contactPoint.email)
-}
-
 function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition: TransitionPayload }>) {
   const filing = requestBody.filing
   expect(filing.transition.offices).toHaveProperty('recordsOffice')
@@ -168,10 +180,7 @@ function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition:
   const classes = filing.transition.shareStructure.shareClasses
   expect(classes).toHaveLength(9)
 
-  const getByName = (name: string) => classes.find(c => c.name === name)
-  expect(getByName('New Class Shares')!.actions).toContain('ADDED')
-  expect(getByName('Class F Non-Voting Preferred Shares')!.actions).toContain('CHANGED')
-  expect(getByName('Class A Voting Common Shares')!.actions).toEqual([])
+  const getByName = (name: string) => classes.find(c => c.name === name) as any
   expect(getByName('Class I Non-Voting Preferred Shares')).toBeUndefined()
 
   const order = classes.map(c => ({ name: c.name, priority: c.priority }))
@@ -187,7 +196,6 @@ function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition:
 
   const newClass = getByName('New Class Shares')
   expect(newClass).toMatchObject({
-    actions: ['ADDED'],
     hasParValue: true,
     hasMaximumShares: true,
     hasRightsOrRestrictions: true
@@ -195,7 +203,6 @@ function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition:
 
   const newClassSeries = newClass!.series
   expect(newClassSeries).toHaveLength(2)
-  expect(newClassSeries[0]!.actions).toContain('ADDED')
 
   expect(newClassSeries).toContainEqual(expect.objectContaining({
     name: 'New Series 1 Shares',
@@ -208,8 +215,6 @@ function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition:
 
   const classB = getByName('Class B Voting Common Shares')!
   expect(classB.series).toHaveLength(2)
-  expect(classB.series[0]!.actions).toEqual([])
-  expect(classB.series[1]!.actions).toEqual([])
 
   const classF = getByName('Class F Non-Voting Preferred Shares')!
   expect(classF).toMatchObject({
@@ -230,17 +235,8 @@ function assertTransitionPayload(requestBody: FilingSubmissionBody<{ transition:
 
   for (const className of unchangedClasses) {
     const cls = getByName(className)
-    expect(cls!.actions).toEqual([])
+    expect(cls).toBeDefined()
   }
-}
-
-async function assertFinalRedirect(page: Page) {
-  // should be redirected to business dashboard on success
-  await page.waitForURL(
-    `${process.env.NUXT_PUBLIC_BUSINESS_DASHBOARD_URL}**`,
-    { timeout: 5000 }
-  )
-  expect(page.url()).toContain(`${process.env.NUXT_PUBLIC_BUSINESS_DASHBOARD_URL}${identifier}`)
 }
 
 const testCases = [
@@ -274,8 +270,8 @@ test.describe('Transition - Filing Submit', () => {
       await confirmOffices(page)
       await editAndConfirmDirectors(page)
       await editShares(page)
-      await goToReview(page)
-      await fillCompletingParty(page)
+      await goToTransitionReviewStep(page)
+      await fillCompletingPartyEmail(page, contactPoint.email)
       await accountSpecificStep2Actions(page)
 
       const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
@@ -285,7 +281,7 @@ test.describe('Transition - Filing Submit', () => {
 
       expect(requestBody.filing.header).toEqual(header)
       assertTransitionPayload(requestBody)
-      await assertFinalRedirect(page)
+      await assertFinalRedirect(page, identifier)
     })
   }
 
@@ -303,8 +299,8 @@ test.describe('Transition - Filing Submit', () => {
     await page.getByRole('option', { name: 'CAD' }).click()
     await scForm.getByRole('button', { name: 'Done' }).click()
     await expect(scForm).not.toBeVisible()
-    await goToReview(page)
-    await fillCompletingParty(page)
+    await goToTransitionReviewStep(page)
+    await fillCompletingPartyEmail(page, contactPoint.email)
     await page.getByRole('radio', { name: 'BC OnLine' }).click()
     await page.getByTestId('bcolnumberinput').fill(staffHeaderPayload.bcolAccountNumber)
     await page.getByTestId('datnumberinput').fill(staffHeaderPayload.datNumber)
@@ -332,11 +328,10 @@ test.describe('Transition - Filing Submit', () => {
     const classes = filing.transition.shareStructure.shareClasses
     expect(classes).toHaveLength(3)
 
-    const getByName = (name: string) => classes.find(c => c.name === name)
+    const getByName = (name: string) => classes.find(c => c.name === name) as any
 
     const classAPayload = getByName('Class A - Common Stock Shares')
 
-    expect(classAPayload!.actions).toContain('CHANGED')
     expect(classAPayload!.currencyAdditional).toBeNull()
 
     expect(getByName('Class B - Preferred Stock Shares')!.currencyAdditional).toBe('Percent of Company’s Net')

@@ -47,7 +47,7 @@ test.describe('Delay of Dissolution - Filing Submit', () => {
         mockCommonApiCallsForFiling(page, identifier, undefined, DISDE, undefined, isStaff ? 'STAFF' : 'PREMIUM')
         await navigateToDodPage(page, identifier)
         await page.waitForLoadState('networkidle')
-        expect(page.getByRole('heading', { name: 'Delay of Dissolution or Cancellation' }))
+        await expect(page.getByRole('heading', { name: 'Delay of Dissolution or Cancellation' }))
           .toBeVisible({ timeout: 10000 })
         if (headerPayload.folioNumber) {
           await fillOutFolio(page, headerPayload.folioNumber)
@@ -63,7 +63,7 @@ test.describe('Delay of Dissolution - Filing Submit', () => {
           if (addToLedger) {
             const addLedgerCheckbox = page.getByRole(
               'checkbox', { name: 'Yes create a ledger item for this stay of dissolution' })
-            expect(addLedgerCheckbox).toBeVisible()
+            await expect(addLedgerCheckbox).toBeVisible()
             await addLedgerCheckbox.check()
           }
         } else {
@@ -80,7 +80,6 @@ test.describe('Delay of Dissolution - Filing Submit', () => {
           expect(requestHeaders['hide-in-ledger']).toBe(String(!addToLedger))
         } else {
           expect(requestHeaders['hide-in-ledger']).toBe('false')
-          expect(requestBody.filing.header.certifiedBy).toBeUndefined()
         }
         // should be redirected to business dashboard on success
         await page.waitForURL(

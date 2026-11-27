@@ -1,5 +1,437 @@
 # @sbc-connect/nuxt-business-base
 
+## 0.30.0
+
+### Minor Changes
+
+- [#626](https://github.com/bcgov/business-ui/pull/626) [`baaa450`](https://github.com/bcgov/business-ui/commit/baaa450140ad54620c49baf41e091a632f5cd3cd) Thanks [@eve-git](https://github.com/eve-git)! - `FormAddress` delivery addresses cannot be a PO Box by default (`noPoBox` now defaults to `true`), with the "Address cannot be a PO Box" hint under the delivery street. Pass `noPoBox: false` to allow a PO Box delivery address (e.g. liquidators); the hint is hidden then.
+
+- [#617](https://github.com/bcgov/business-ui/pull/617) [`3a4c793`](https://github.com/bcgov/business-ui/commit/3a4c793baad76a424dfb1f7511112cba14fd457c) Thanks [@eve-git](https://github.com/eve-git)! - Refactor ManageAmalgamation component and useManageAmalgamation composable
+  - Moved amalgamation component and composable to be under the `/manage` directory.
+  - Combined the amalgamating business and statement models into a single `active-subject` model, typed by the new `getActiveAmalgamationSchema()` zod discriminated union (`key: 'business' | 'statement'`), matching ManageShareStructure. Removed the `active-amal-stmnt` model, and the default model name is now `activeSubject`. Consumers nested in a parent UForm pass `model-name="<key>.value"`.
+  - Removed `getActiveAmalgamationCorrectSchema`/`getActiveAmalgamationCorrectStatementSchema` and their types; `addSubject`, `editSubject` and `updateStatement` in useManageAmalgamation now take `ActiveAmalgamationSchema`.
+  - Moved `preventActions` and `actionPreventedSignal` into `ManageAmalgamationProps` - not available on the readonly variants.
+  - ManageAmalgamation now uses useManageCommon for variants, allowed actions, label overrides and alerts, and shows the task guard alert when an action is prevented from the table or statement.
+  - ManageAmalgamationStatement now receives the parent `stateKey`.
+  - useManageAmalgamation uses cloneDeep and getIsExistingRecord, and undoSubject no longer shares a reference between the old and new state.
+  - TableAmalgamation syncs isEditing from the expanded state and accepts `hideActionsWhen`.
+
+- [#612](https://github.com/bcgov/business-ui/pull/612) [`cc32bca`](https://github.com/bcgov/business-ui/commit/cc32bca4009a0af1a89a366ad009e7e8372b0b59) Thanks [@eve-git](https://github.com/eve-git)! - Refactor ManageCourtOrders component and useManageCourtOrders composable
+  - Moved court order component and composable to be under the `/manage` directory.
+  - Renamed the active court order model to `active-subject` and the default `modelName` to `activeSubject`.
+  - Moved `preventActions` and `actionPreventedSignal` into `ManageCourtOrdersProps` - not available on the readonly variants.
+  - ManageCourtOrders now uses useManageCommon for variants, allowed actions, label overrides and alerts.
+  - useManageCourtOrders uses cloneDeep and getIsExistingRecord, and undoSubject no longer shares a reference between the old and new state.
+  - TableCourtOrder syncs isEditing from the expanded state.
+
+- [#618](https://github.com/bcgov/business-ui/pull/618) [`f68b7c7`](https://github.com/bcgov/business-ui/commit/f68b7c7bc422940ef3e28ad2e8598542b1be8d91) Thanks [@meawong](https://github.com/meawong)! - Add the FormReviewWrapper component and enable view-only mode for staff viewing drafts not marked as staff-filed.
+
+- [#624](https://github.com/bcgov/business-ui/pull/624) [`bbe3b00`](https://github.com/bcgov/business-ui/commit/bbe3b0068197066f45768aa91545b4dc1bf1814d) Thanks [@kialj876](https://github.com/kialj876)! - Court order form redesign (plain court order section, standalone filing section and the correction sub form)
+  - `FormCourtOrderPoa`: one "Court Order" row with the number above the Plan of Arrangement checkbox; the hint (`text.courtOrderNumberHint`) sits in the card above the input and the error shows under the input with the caution icon; input label is `label.courtOrderNumberIfExists`; checking Plan of Arrangement with no number shows `validation.courtOrderNumberRequired` right away
+  - `FormCourtOrderPoaFields`: one "Court Order" row with the number above the Plan of Arrangement checkbox; "Court Order Details" is a multi-line `ConnectTextarea` that autogrows and stays resizable (`label.courtOrderDetails` / `label.courtOrderDetailsOpt`)
+  - `FormCourtOrderPoaFullFileUpload`: opt-in `supportingDocsCheckbox` variant puts the supporting documents upload behind an "Add supporting documents" checkbox (`v-model:has-supporting-docs`, `label.addSupportingDocuments`, `supportingDocsError`) - disabled while supporting documents exist; without it the supporting upload always shows, as before
+  - `getCourtOrderPoaFullSchema`: UI-only `hasSupportingDocs` field (derived true from the files on parse, omitted from the manage court orders edit equality check); with `isFileOrDetailsRequired` it errors with `validation.addSupportingDocsOrUncheck` when checked with nothing uploaded; new `hasActiveSupportingDoc` helper
+  - `FormCourtOrderPoaFullFiling`: uses the checkbox variant and no longer renders a visible legend (the fieldset keeps its accessible name)
+  - `FormCourtOrderPoaFullFileUploadItem.readonly`: hides the file actions for review displays
+  - Court order max upload size is now 50 MB
+  - BREAKING: `FormCourtOrderPoaFullFiling` `order` prop is removed
+  - BREAKING: `label.courtOrderText`, `label.addCourtOrderText`, `label.addCourtOrderTextOpt`, `label.courtOrderNumberOpt` and `text.courtOrderAndPoaDescription` are removed
+
+- [#630](https://github.com/bcgov/business-ui/pull/630) [`f4d2ce9`](https://github.com/bcgov/business-ui/commit/f4d2ce9295d058d95ca342f87330416fdb511010) Thanks [@eve-git](https://github.com/eve-git)! - `getToday()` now defaults to pacific time (`America/Vancouver`) instead of UTC, so dates set from "today" match the business's local date. Callers that pass no timezone (filing header `date`, role cessation dates) now get the pacific date; pass `'UTC'` explicitly to keep the old behaviour.
+
+- [#628](https://github.com/bcgov/business-ui/pull/628) [`bef0735`](https://github.com/bcgov/business-ui/commit/bef073566ebfadb786e29643d7e8c26f10707b8c) Thanks [@leodube-aot](https://github.com/leodube-aot)! - Public business tombstone: show an "IN LIQUIDATION" badge when the business has `inLiquidation` set, alongside the existing non-active state badge.
+
+- [#604](https://github.com/bcgov/business-ui/pull/604) [`ca89e31`](https://github.com/bcgov/business-ui/commit/ca89e314c6caafe90f9f1928c526ac94305c7043) Thanks [@deetz99](https://github.com/deetz99)! - Add filing section validation support to business services and ManageYourCompany component
+  
+  - Add `validateFilingSection` endpoint service and query options for partial filing validations
+  - Update `ManageYourCompany` to accept `filingType` and `filingSubType` props
+  - Pass filing context to `getActiveYourCompanySchema` to enable asynchronous legal name designation validation
+
+- [#629](https://github.com/bcgov/business-ui/pull/629) [`4962163`](https://github.com/bcgov/business-ui/commit/4962163fb24c06c74e031415db6bdc78a0acb8c7) Thanks [@eve-git](https://github.com/eve-git)! - `ManageParties` renders a liquidator specific sub form (`FormLiquidatorDetails`) when `roleType` is Liquidator, in place of `FormPartyDetails`:
+  - "Appointed by" the company or the court (required), with a required court order number when appointed by the court. Stored on the liquidator role's `meta` (`appointmentMethod`, `courtOrderNumber`), matching the business-schemas relationship schema.
+  - A required effective date, stored on the liquidator role's `appointmentDate` (bounded by `partyFormProps.effectiveDateBounds`).
+
+- [#614](https://github.com/bcgov/business-ui/pull/614) [`1e71b17`](https://github.com/bcgov/business-ui/commit/1e71b17a992602f0e7b5a80102db155606947ee0) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - Address form options for the Review Imported Data filing
+  - New `AddressFormProps` (`bcCanadaOnly`, `validateOnOpen`, `noPoBox`, `hideSameAs`, `disabledFields`) is the single way to configure `FormAddress` from `FormOfficeDetails`, `FormPartyDetails`, `ManageOffices` (`addressFormProps`) and `ManageParties` (`partyFormProps.addressFormProps`).
+  - BREAKING: `bcCanadaOnly` and `validateOnOpen` moved off `ManageOffices` / `FormOfficeDetails` / `FormPartyDetails` / `partyFormProps` into `addressFormProps` (e.g. `bc-canada-only` becomes `:address-form-props="{ bcCanadaOnly: true }"`).
+  - `getAddressSchema` / `getAddressWithIdSchema` take a `noPoBox` option: the delivery address street cannot be a PO Box. Off by default.
+  - `hideSameAs` drops the 'same as mailing' checkbox; the caller keeps `sameAs` false on the model.
+  - `disabledFields` renders the listed inputs disabled and skips their validation errors (`getEditableAddressErrors`).
+
+- [#621](https://github.com/bcgov/business-ui/pull/621) [`ab1b60d`](https://github.com/bcgov/business-ui/commit/ab1b60dc3b0e5a99195bb566ac65078eccd3cfe8) Thanks [@deetz99](https://github.com/deetz99)! - Update dependencies to latest: Nuxt, pdfjs, formatjs/intl-datetimeformat, connect-pay.
+
+- [#616](https://github.com/bcgov/business-ui/pull/616) [`412bc3b`](https://github.com/bcgov/business-ui/commit/412bc3ba48e88d33894bc2211148d7065d2d0dd6) Thanks [@kialj876](https://github.com/kialj876)! - Draft rebase: resume a draft over filings staff made since it was saved
+  - BREAKING: `initFiling(businessId, filingName, options)` takes an options object (`filingSubType`, `draftId`, `parties`, `offices`, `shareClasses`, `nameTranslations`, `resolutions`) and returns each requested section merged with the draft; `mergeDraftOffices: false` for read-only offices
+  - BREAKING: `getBusinessAddresses(businessId, officeTypes?, date?, force?)` returns UI-shaped rows only; the `'table'` form, `formatAddressTableState` and `formatDraftTableState` are removed
+  - BREAKING: `saveOrUpdateDraftFiling(identifier, body, isSubmission, filingId?, opts?)` - last argument is `{ baseTransactionId?, headers? }`
+  - `saveOrSubmitFiling`: sends `baseTransactionId` from `useDraftRebase().getSaveOptions`; `syncUrlDraftParam` option
+  - new `useDraftRebase`, `utils/draft-rebase`, `useBusinessService.getFilingChanges`, `useBusinessQuery.filingChanges` / `filingChangesOptions`: resolve the Legal API `/changes` report against the draft
+  - `getBusinessParties(..., force)`
+  - `getCachedOrFetch(options, force)`: a forced fetch joins a request already in flight instead of aborting it
+  - `TableBusinessState.modifiedByStaff`, "MODIFIED BY STAFF" badge in `getTableBadges` (shown only while the row has no action of its own; undo brings it back), `ManageYourCompanyFieldBadge` `modifiedByStaff` prop
+  - new `AlertDraftRebase`: the warning under a filing heading listing what staff changed per section since the draft was started (reads `useDraftRebase().report`; hidden until a draft is rebased); `DraftChangeConflict` / `DraftChangeApplied` / `DraftChangeAbsorbed` gain the Legal API's `change: added | modified | removed`; `resolveDraftConflicts` pairs share classes by `rowId` before name (a staff rename substitutes the renamed class instead of keeping the draft's old-name row beside it); `courtOrders` joins `DraftChangesSection` / `StaffModifiedKeys` / `staleIds` (correction drafts: the draft's row for a court order staff changed is dropped so the current one shows through, badged by id)
+  - `useFilingModals().openDraftStaleModal`: `openSaveFilingErrorModal` shows it instead of the generic error when a rebased submission hit 409 (the work is parked as a draft; "Review Changes" reloads the page, "Return to My Business" leaves)
+  - BREAKING: the dead `useFilingModals().openPendingTaskOnSaveOrSubmitModal` and its `modal.error.filing.pendingTaskOnSaveOrSubmit` strings are removed
+  - `useFilingPage().submitFiling` keeps the resumed draft id in the url when the failed submit carried no filing
+  - `useFilingModals().openGetDraftChangesErrorModal`: `initFiling` opens it and returns no draft when the changes report fails for any reason but a 404 (the 404 still resumes the draft as saved)
+  - `BusinessLedgerItem.filedByStaff` (optional, copied onto the bootstrap ledger item) - the submitter side legal-api reports on every ledger row
+
+- [#606](https://github.com/bcgov/business-ui/pull/606) [`e3927e6`](https://github.com/bcgov/business-ui/commit/e3927e6f4815f61e26fc0416ddcb4ab13afdc010) Thanks [@eve-git](https://github.com/eve-git)! - Refactor ManageOffices component and useManageOffices composable
+  - Moved office component and composable to be under the `/manage` directory.
+  - Renamed the active office model to `active-subject` and the default `modelName` to `activeSubject`.
+  - Moved `preventActions` and `actionPreventedSignal` into `ManageOfficesProps` - not available on the readonly variants.
+
+### Patch Changes
+
+- [#623](https://github.com/bcgov/business-ui/pull/623) [`941339a`](https://github.com/bcgov/business-ui/commit/941339a67539b5b5fed3166dab5874ead1d17d33) Thanks [@eve-git](https://github.com/eve-git)! - `FormAddress` "Delivery Address same as Mailing Address" works with the delivery-only rules (`bcCanadaOnly: 'delivery'`, `noPoBox`):
+  - While checked, the delivery address mirrors mailing address edits instead of resetting and unchecking.
+  - A delivery-only error (e.g. a PO Box street, or outside BC when only the delivery address must be in BC) unchecks it and shows the delivery inputs, prefilled with the mailing address, with the error. The page scrolls to the first delivery error and focuses it. Errors both addresses share stay on the mailing inputs with the box left checked.
+  - The box is greyed out while the mailing address cannot be used as the delivery address.
+
+- [#631](https://github.com/bcgov/business-ui/pull/631) [`a7ad5c7`](https://github.com/bcgov/business-ui/commit/a7ad5c7eccbe4db9ab8c820a25eb516dbe97f810) Thanks [@eve-git](https://github.com/eve-git)! - `FormAddress`: with "same as" checked and both addresses required in BC (e.g. the liquidation records office), moving the mailing province out of BC and back no longer unchecks "same as" and leaves a stale "Address must be in British Columbia" error on the delivery address. Re-checking the filled fields now replaces their previous errors instead of only adding new ones.
+
+- [#613](https://github.com/bcgov/business-ui/pull/613) [`1773c70`](https://github.com/bcgov/business-ui/commit/1773c70b1399a7717cc128c0479288777a335a18) Thanks [@meawong](https://github.com/meawong)! - Update connect-pay dependency
+
+- [#635](https://github.com/bcgov/business-ui/pull/635) [`84baf9b`](https://github.com/bcgov/business-ui/commit/84baf9b863a8e6114eacbd66cf13fd43e03849a7) Thanks [@eve-git](https://github.com/eve-git)! - Update deleted styling for all tables: the DELETED badge keeps its own style and is no longer greyed out with its deleted row in the offices and amalgamating businesses tables (only the name is greyed out), matching the other tables. The badge style is now one shared `DELETED_BADGE_CLASS`, used by the table badges and the court order file list.
+
+- [#622](https://github.com/bcgov/business-ui/pull/622) [`e29be5b`](https://github.com/bcgov/business-ui/commit/e29be5b269ad9efd57e27036127cc4a8fab0442c) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Folio or Reference Number accepts up to 50 characters in every filing, matching the account record and the filing schema, so a business's default folio always passes validation.
+
+- [#609](https://github.com/bcgov/business-ui/pull/609) [`04db065`](https://github.com/bcgov/business-ui/commit/04db0650fa685ac564055872048d0c8442b3356a) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Party table: show the former name line in the neutral text token (gray-700, [#495057](https://github.com/bcgov/business-ui/issues/495057)) so it reads as secondary text next to the bold current name.
+
+- [#619](https://github.com/bcgov/business-ui/pull/619) [`4b9e6f3`](https://github.com/bcgov/business-ui/commit/4b9e6f32a08f02cfd830b61d4490c91e20306eb9) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - `ManageOffices` `hideRemove` also hides Remove in the table row actions, including on an added row.
+
+- [#619](https://github.com/bcgov/business-ui/pull/619) [`835ae50`](https://github.com/bcgov/business-ui/commit/835ae508be3c44f9fe67d09f90270f6967f80b8a) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - `FormAddress` renders `disabledFields` inputs as a flat grey box, without the input underline.
+
+- [#611](https://github.com/bcgov/business-ui/pull/611) [`03a12fd`](https://github.com/bcgov/business-ui/commit/03a12fd3674095762905351550c57f1bbe145248) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Folio, certify and confirm authorization boxes: 32px top and bottom padding with the default side padding, per the UX review, so the review page boxes share one outer spacing.
+
+- [#625](https://github.com/bcgov/business-ui/pull/625) [`3cebf72`](https://github.com/bcgov/business-ui/commit/3cebf72ff8ea7804f3a6cf9c1c4be51c905d501b) Thanks [@kialj876](https://github.com/kialj876)! - Draft rebase: no warning or conflict for filings that changed nothing the draft holds
+  - `AlertDraftRebase`: hidden when the report lists no changes (the unknown-base warning still shows)
+  - `saveOrSubmitFiling`: a submission that hit 409 re-reads the `/changes` report for the parked draft and resubmits once at the new base when it lists no changes; `useDraftRebase().advanceBaseIfUnaffected`
+
+## 0.29.0
+
+### Minor Changes
+
+- [#605](https://github.com/bcgov/business-ui/pull/605) [`fe091a2`](https://github.com/bcgov/business-ui/commit/fe091a28fbb471b054540bb983641859855fc0d1) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - ManageOffices / ManageParties: add a `before-table` slot for a notice above the table, a `validateOnOpen` option (ManageOffices prop / `partyFormProps.validateOnOpen`) that opens an address form with its validation errors shown, and `labelOverrides.invalidAddress` to mark incomplete mailing / delivery addresses in their table cells. FormAddress: `validateOnOpen` prop.
+  
+  FormAddress: the "Delivery Address same as Mailing Address" checkbox now leads the Delivery Address section (Components 2.0); the delivery inputs render under it while unchecked.
+
+### Patch Changes
+
+- [#603](https://github.com/bcgov/business-ui/pull/603) [`1d26c55`](https://github.com/bcgov/business-ui/commit/1d26c55137c280be3d3d42141ee1c87dc06af052) Thanks [@JazzarKarim](https://github.com/JazzarKarim)! - Corp info: Fix "Cemetary" typo to "Cemetery" in the CEM corp type descriptions and rename `CorpTypeCd.CEMETARY` to `CorpTypeCd.CEMETERY`.
+
+- [#600](https://github.com/bcgov/business-ui/pull/600) [`f8121ba`](https://github.com/bcgov/business-ui/commit/f8121babd3b1addad162c3fa0808e410cc198281) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Wrap the former name shown under a NAME_CHANGED party in parentheses, "(Formerly [OLD NAME])", to match the design
+
+- [#598](https://github.com/bcgov/business-ui/pull/598) [`2000ea7`](https://github.com/bcgov/business-ui/commit/2000ea7d250e6b96e140437e38a4d72ef725146b) Thanks [@deetz99](https://github.com/deetz99)! - Share class formatter and name column util: Add fallback for possibly null or undefined name property from db.
+
+- [#599](https://github.com/bcgov/business-ui/pull/599) [`18a1ec6`](https://github.com/bcgov/business-ui/commit/18a1ec6e7ecf00b2fc4addf18fa6312a861cce7e) Thanks [@meawong](https://github.com/meawong)! - Added a utility to resolve region codes to their display names.
+
+## 0.28.0
+
+### Minor Changes
+
+- [#587](https://github.com/bcgov/business-ui/pull/587) [`9317b53`](https://github.com/bcgov/business-ui/commit/9317b53f45ade87238cc95299ccc27c4eaeee3b3) Thanks [@eve-git](https://github.com/eve-git)! - Refactor ManageParties component and useManageParties composable
+  - Moved party component and composable to be under the `/manage` directory.
+  - Renamed the active party model to `active-subject` and kept the default `modelName` as `activeParty`.
+  - useManageParties only handles table state, accepts an optional `cleanupFn` and uses generic subject naming (`addSubject`, `removeSubject`, `undoSubject`, `editSubject`).
+  - Table rows are now identified by `new.id` - new parties get a generated UI id which is not sent to the API.
+  - ManageParties now uses useManageCommon for variants, allowed actions, label overrides and alerts.
+
+- [#582](https://github.com/bcgov/business-ui/pull/582) [`2412e60`](https://github.com/bcgov/business-ui/commit/2412e60b598cd5629a3671291e971eb0a278941b) Thanks [@deetz99](https://github.com/deetz99)! - Refactor ManageShareStructure models and composable actions
+  - Replaced separate class, series and date model with a single activeSubject model ref.
+  - Simplify useManageShareStructure add, undo, remove, edit methods to handle multiple schema types using type predicates.
+  - Update useManageCommon to accept multiple alert target IDs for a single model ref.
+  - Moved share structure component and composable to be under the `/manage` directory.
+
+- [#584](https://github.com/bcgov/business-ui/pull/584) [`5a838ba`](https://github.com/bcgov/business-ui/commit/5a838ba1832e0ae699af4910d5a659f937b2c78f) Thanks [@deetz99](https://github.com/deetz99)! - - formatOfficesApi: Include all offices if any have changes.
+  - ManageShareStructure: handle standalone resolution date sync automatically
+    - Add an optional `resolutionDate` property to `useManageShareStructure` options.
+    - Sync standalone date input directly into the `resolutionDates` array whenever provided and valid.
+    - Update `ManageShareStructure` to display all dates when in `readonly` variant or omit the active standalone date outside of readonly variant.
+
+- [#577](https://github.com/bcgov/business-ui/pull/577) [`17b25f3`](https://github.com/bcgov/business-ui/commit/17b25f31edf952938dc8f3d8e765f8e88827ed56) Thanks [@deetz99](https://github.com/deetz99)! - Updated dependencies and minimum Node.js requirement.
+  
+  - **BREAKING**: Requires Node version `>=24.15` and `<25`.
+  - Updated Nuxt UI dependency (style resolution changes may affect custom themes).
+
+- [#596](https://github.com/bcgov/business-ui/pull/596) [`0640663`](https://github.com/bcgov/business-ui/commit/0640663c59340987c15ae32abd963ec4b7fa12ec) Thanks [@deetz99](https://github.com/deetz99)! - ManageYourCompany: Remove Company Name NR and Name to Numbered options, leaving only free text edits available. Enforce strict designation matching when validating Legal Name changes.
+
+- [#595](https://github.com/bcgov/business-ui/pull/595) [`7fb9f6d`](https://github.com/bcgov/business-ui/commit/7fb9f6d3649a9ff46c841de3141d8aa4b51aaca2) Thanks [@deetz99](https://github.com/deetz99)! - SubFormWrapper: Add optional `container` prop, defaults to true, set to false to remove the container styling. FormNameTranslation: Set container = false to remove container styling in sub form.
+
+- [#591](https://github.com/bcgov/business-ui/pull/591) [`5c74a4c`](https://github.com/bcgov/business-ui/commit/5c74a4ca286da16412275bc42101690e7b134890) Thanks [@deetz99](https://github.com/deetz99)! - Add DateTimeFormat polyfill to pull in latest TZ data for outdated browsers. Fix toPacificDateTime formatting.
+
+- [#576](https://github.com/bcgov/business-ui/pull/576) [`58cb41d`](https://github.com/bcgov/business-ui/commit/58cb41d84082518b9d2576308ba8c94fd9df5fa7) Thanks [@eve-git](https://github.com/eve-git)! - Align ManageNameTranslations with the manage conventions. Move component to components/Manage/NameTranslations and composable to composables/manage. useManageNameTranslations now only handles tableState, accepts an optional opts.cleanupFn, uses generic subject naming (addSubject, editSubject, removeSubject, undoSubject), updates rows by new.id and uses cloneDeep and isEqualOmit. ManageNameTranslations handles expanded/adding state locally, uses useManageCommon and no longer requires the active-name-translation model. TableNameTranslation sets get-row-id to row.new.id and syncs isEditing from the expanded state.
+
+### Patch Changes
+
+- [#594](https://github.com/bcgov/business-ui/pull/594) [`04af45a`](https://github.com/bcgov/business-ui/commit/04af45a13ba0dc9293596e6e0b8004d123e7b0b2) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - FormFolio follows the folio design from bcgov/entity#35355 wherever it is used: when the business has a folio on file it offers "Use Default Folio or Reference Number" or "Enter a different number for this transaction only", otherwise the single input stays as before. The section is marked optional, has a "Help with Folio or Reference Numbers" expansion (its content also differs by state and links to the View and Change Business Information page in the edit UI), the section and card texts follow the design for both states, and the folio max length is 30 characters for all filings. The `defaultFolio` prop overrides the value from the business store.
+
+- [#579](https://github.com/bcgov/business-ui/pull/579) [`ac1d23f`](https://github.com/bcgov/business-ui/commit/ac1d23f23d9b961231b1d8d5aafc5bfd8d66d242) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Extended `FilingPagePreTaskGuard` type to support async guards (`boolean | Promise<boolean>`) and await the result in `useFilingPage` submit and save handlers.
+
+- [#597](https://github.com/bcgov/business-ui/pull/597) [`7ae5176`](https://github.com/bcgov/business-ui/commit/7ae517698e5d3e11c0ce0ee279121ec5b233766b) Thanks [@JazzarKarim](https://github.com/JazzarKarim)! - useBusinessTombstone: Show "Not Available" for the incorporation/registration date in setPublicDefault when the business has the mainframe migration placeholder founding date (0001-01-01T08:00:00+00:00).
+
+- [#590](https://github.com/bcgov/business-ui/pull/590) [`4733769`](https://github.com/bcgov/business-ui/commit/4733769f7dbc5b414392c43bc7fb7e582c50cafb) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Show "Formerly [OLD NAME]" under the new name for NAME_CHANGED parties
+  - `getPartyNameColumn`, `getPartyTableColumns`, `TableParty` and `ManageParties` show the previous name in italic below the new name wherever a party's name was changed (Change of Directors, corrections, officer change and any other party table).
+  - `showFormerName` defaults to `true`; pass `false` to opt a table out.
+
+- [#581](https://github.com/bcgov/business-ui/pull/581) [`5238c36`](https://github.com/bcgov/business-ui/commit/5238c36026f707f031de318c9b3be87d2caa36b2) Thanks [@benjamin-bc-gov](https://github.com/benjamin-bc-gov)! - Updated jurisdiction display in business ledger and `getJurisdictionLabel` to show only the province/state name for CA and US jurisdictions, removing the country suffix. Fixes bcgov/entity#35269.
+
+- [#588](https://github.com/bcgov/business-ui/pull/588) [`2703597`](https://github.com/bcgov/business-ui/commit/2703597e73b83922a4fa59b6bc0ee66311c01a10) Thanks [@deetz99](https://github.com/deetz99)! - FormAddress: Clear deliveryAddress validation errors when unchecking 'same as' checkbox.
+
+- [#583](https://github.com/bcgov/business-ui/pull/583) [`d3ba740`](https://github.com/bcgov/business-ui/commit/d3ba740d3b8e29919eba36d45b850c9a86dc3979) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - Add the reviewImportedData filing type, its REVIEW_IMPORTED_DATA_FILING permission mapping and filing name. Address schemas and ManageOffices accept `bcCanadaOnly: 'delivery'` (delivery address only; while 'same as' is checked the BC/Canada errors are raised on the visible mailing inputs), ManageOffices gains a `hideRemove` prop, and BusinessWarning.data types the missing info `officeType` / `partyId` keys.
+
+- [#578](https://github.com/bcgov/business-ui/pull/578) [`c1c8f12`](https://github.com/bcgov/business-ui/commit/c1c8f1205ae1e678a7a2007e76c05ab7c35ef44d) Thanks [@deetz99](https://github.com/deetz99)! - Fix offices draft merging issue.
+
+## 0.27.0
+
+### Minor Changes
+
+- [#564](https://github.com/bcgov/business-ui/pull/564) [`b619c91`](https://github.com/bcgov/business-ui/commit/b619c917e65e4db0186794ea928d1e1173aabaab) Thanks [@eve-git](https://github.com/eve-git)! - FormEffectiveDate - allow custom min and max date boundary messages
+
+- [#567](https://github.com/bcgov/business-ui/pull/567) [`d63f938`](https://github.com/bcgov/business-ui/commit/d63f938efa6d528cb886d84436f7653155b06888) Thanks [@kialj876](https://github.com/kialj876)! - Director-change kit: getDirectorChangeManagePartiesProps, buildChangeOfDirectorsRelationships, syncDirectorChangeFee, getDirectorWarning, and an opt-in legal-name-change confirmation checkbox in the party name form; FormPartyDetails scopes the allow-any-edits escape to added parties.
+
+- [#560](https://github.com/bcgov/business-ui/pull/560) [`b7bcb32`](https://github.com/bcgov/business-ui/commit/b7bcb32484a112bd75c0dfda1c8662b4740d454c) Thanks [@deetz99](https://github.com/deetz99)! - Remove ManageCompanyName and replace with ManageYourCompany. Component, composable and utils all affected. Create jurisdiction list and display value utils. Soften typing on isEqualOmit function.
+
+- [#567](https://github.com/bcgov/business-ui/pull/567) [`d63f938`](https://github.com/bcgov/business-ui/commit/d63f938efa6d528cb886d84436f7653155b06888) Thanks [@kialj876](https://github.com/kialj876)! - Change-of-address foundations: buildChangeOfAddressOffices payload builder and a bcCanadaOnly option on the address schemas (inline validation errors, inputs stay editable).
+
+- [#552](https://github.com/bcgov/business-ui/pull/552) [`3501994`](https://github.com/bcgov/business-ui/commit/3501994da7cc4c2aaf51a5f6df9b52ff92aaf534) Thanks [@deetz99](https://github.com/deetz99)! - ManageAmalgamation - only allow changes by default. Create formatters for amalgamation section and api payload
+
+- [#575](https://github.com/bcgov/business-ui/pull/575) [`954c797`](https://github.com/bcgov/business-ui/commit/954c797ef2461a28f585c089c0df8ba26315d41f) Thanks [@deetz99](https://github.com/deetz99)! - Add fieldOverrides prop and helper composable to ManageYourCompany component to support nested field configs.
+
+- [#546](https://github.com/bcgov/business-ui/pull/546) [`3591917`](https://github.com/bcgov/business-ui/commit/3591917253d6ac44213674eb2cb5b407639d28eb) Thanks [@deetz99](https://github.com/deetz99)! - FormCourtOrderPoaFull document upload - update typing to use and normalize into client type
+  
+  - add dismiss button to remove errored docs
+  - add upload percentage in ui
+  - create custom xhr request to return upload progress
+  - add upload error text to button aria describedby
+  - increase font sizes
+  - stop click event propagation from submitting form
+  - disable dropzone on touch devices
+  - fix thumbnail display
+  
+  SubFormWrapper - scroll into view on mount
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`b34cea2`](https://github.com/bcgov/business-ui/commit/b34cea2de7417b8ac1a6c6302805cbc808502023) Thanks [@eve-git](https://github.com/eve-git)! - Create court order file formatters, add documents to court orders table.
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`6c201c7`](https://github.com/bcgov/business-ui/commit/6c201c7bcbc6216cf341d2752077a78c4c65f4fe) Thanks [@eve-git](https://github.com/eve-git)! - Create realtime upload for court order documents section'
+
+- [#551](https://github.com/bcgov/business-ui/pull/551) [`fd8ade4`](https://github.com/bcgov/business-ui/commit/fd8ade4b4748092af2f60e27356ecd377093c43f) Thanks [@eve-git](https://github.com/eve-git)! - Add an `email` column for the party table and track email changes for corrections.
+  
+  - Added `getEmailColumn` and wired it into `getPartyTableColumns` as the `email` column, used by custodian-of-records sections.
+  - Added `'email'` to `TablePartyColumnName`.
+  - `useManageParties` now compares party `email` against its original value and emits `ActionType.EMAIL_CHANGED` when it differs, alongside the existing `address`/`name`/`roles` sections.
+
+- [#567](https://github.com/bcgov/business-ui/pull/567) [`d63f938`](https://github.com/bcgov/business-ui/commit/d63f938efa6d528cb886d84436f7653155b06888) Thanks [@kialj876](https://github.com/kialj876)! - New FormConfirmCompletingParty section form + getConfirmCompletingPartySchema: confirmation checkbox with the statutory bullets and completing-party name, with a staff variant exposing an editable legal-name input.
+
+- [#534](https://github.com/bcgov/business-ui/pull/534) [`20092ba`](https://github.com/bcgov/business-ui/commit/20092ba29f5a8202f930a024a4fb1693b23eb3a6) Thanks [@deetz99](https://github.com/deetz99)! - - **ManageCourtOrders**: Added `addDefaultValues` prop to support pre-populating default state when adding a new court order.
+  - **FormCourtOrderPoaFull / Schema**: Updated `effectOfOrder` default handling in schema normalization to ensure consistent boolean conversion.
+  - **Court Order Formatters**: Added utility functions to normalize court order data between table UI state and backend API payloads.
+  - **useManageX Composables**: Added a reactive `hasChanges` computed property across management composables (`useManageCourtOrders`, `useManageOffices`, `useManageShareStructure`, etc.) to track section mutation states.
+
+- [#571](https://github.com/bcgov/business-ui/pull/571) [`9f5865b`](https://github.com/bcgov/business-ui/commit/9f5865b10182581f44debac8225e9a2ebed0138f) Thanks [@kialj876](https://github.com/kialj876)! - getCorpFullDescription takes an optional fallback (returned for an unknown or missing code) and shared fee/modal mock handles in the filing-store test kit.
+
+- [#568](https://github.com/bcgov/business-ui/pull/568) [`dc8c983`](https://github.com/bcgov/business-ui/commit/dc8c983b4b4792ef6b750187c8607292bccac700) Thanks [@eve-git](https://github.com/eve-git)! - Corrections - show "Corrected" badge for email changes.
+
+- [#571](https://github.com/bcgov/business-ui/pull/571) [`9f5865b`](https://github.com/bcgov/business-ui/commit/9f5865b10182581f44debac8225e9a2ebed0138f) Thanks [@kialj876](https://github.com/kialj876)! - Filing condensation: useFiling gains hydratePaymentState and saveOrSubmitFiling, new formatPaymentHeaderApi and applyAuthorizationCertify utils, and a useFilingFormState composable, withPaymentSection schema helpers and the shared COD/COA filing body and FilingDraftState interfaces. Adds the filing store spec, makeFeeMock and createFilingPageHelpers test helpers.
+
+- [#571](https://github.com/bcgov/business-ui/pull/571) [`9f5865b`](https://github.com/bcgov/business-ui/commit/9f5865b10182581f44debac8225e9a2ebed0138f) Thanks [@kialj876](https://github.com/kialj876)! - Filing payload helpers follow the `format<X>Api` convention: `formatFilingPayloadApi` (useFiling), and the standalone `formatPaymentHeaderApi`, `formatCommonFilingDataApi`, `applyAuthorizationCertify` (moved out of useFiling), `formatChangeOfAddressOfficesApi` and `formatChangeOfDirectorsRelationshipsApi`.
+  
+  useFilingPage swaps its `h1` override for `i18nParams` (named params for the desc/h1/title keys) and a new `logBlockedSubmission` util logs the payload of a blocked Phase 1 submission.
+  
+  `describeCommonFilingStoreBehaviour` takes a `supportsDrafts` option (default true) - set it false for a file and pay only filing store to skip every draft save/resume/hydration case.
+
+- [#548](https://github.com/bcgov/business-ui/pull/548) [`bceefd6`](https://github.com/bcgov/business-ui/commit/bceefd6017a47d6f79648f8a5a15425c41f2a015) Thanks [@deetz99](https://github.com/deetz99)! - Amalgamation correct statement component. Update SubFormFieldWrapper with orientation prop.
+
+- [#571](https://github.com/bcgov/business-ui/pull/571) [`9f5865b`](https://github.com/bcgov/business-ui/commit/9f5865b10182581f44debac8225e9a2ebed0138f) Thanks [@kialj876](https://github.com/kialj876)! - useFilingPage composable consolidating the filing-page script: the page text/head, the filing navigation and task guards, the save/submit/cancel handlers and the page watcher wiring.
+
+- [#567](https://github.com/bcgov/business-ui/pull/567) [`d63f938`](https://github.com/bcgov/business-ui/commit/d63f938efa6d528cb886d84436f7653155b06888) Thanks [@kialj876](https://github.com/kialj876)! - New FormForeignJurisdiction section form, bare FormForeignJurisdictionField, and getForeignJurisdictionSchema (combined jurisdiction menu, empty region = null); correction filing jurisdiction menus (Amalgamation Correct, Your Company) now use the shared field; amalgamation table jurisdiction column uses getJurisdictionLabel.
+
+- [#537](https://github.com/bcgov/business-ui/pull/537) [`6015887`](https://github.com/bcgov/business-ui/commit/601588750d0802a7f39cdd3e72439a5be37b51a6) Thanks [@eve-git](https://github.com/eve-git)! - Update Effective Date to use the shared Date Picker component from the Connect Nuxt base layer
+
+- [#567](https://github.com/bcgov/business-ui/pull/567) [`d63f938`](https://github.com/bcgov/business-ui/commit/d63f938efa6d528cb886d84436f7653155b06888) Thanks [@kialj876](https://github.com/kialj876)! - Add optional as-of-date (`date` query) support to the parties and addresses fetches (getAddresses, getBusinessParties, getBusinessAddresses, initFiling).
+
+- [#556](https://github.com/bcgov/business-ui/pull/556) [`68946bf`](https://github.com/bcgov/business-ui/commit/68946bf1e68efde07cc80fe6875604e15e42c261) Thanks [@deetz99](https://github.com/deetz99)! - Start refactor of 'Manage' functionality, allow ID in addresses to support Corrections offices changes, fix relationship formatting.
+
+- [#550](https://github.com/bcgov/business-ui/pull/550) [`d4f2168`](https://github.com/bcgov/business-ui/commit/d4f21683d2f2b341363ede37572af04b8e891a40) Thanks [@deetz99](https://github.com/deetz99)! - Create ManageAmalgamation component and composable
+
+- [#565](https://github.com/bcgov/business-ui/pull/565) [`fdbc7d6`](https://github.com/bcgov/business-ui/commit/fdbc7d6bbe3c57d7781092bb05027b4e74976685) Thanks [@deetz99](https://github.com/deetz99)! - Update all dependencies.
+
+- [#573](https://github.com/bcgov/business-ui/pull/573) [`a1f2fa4`](https://github.com/bcgov/business-ui/commit/a1f2fa463bc2ebf0f5c553f9d55a7e8360e9a744) Thanks [@deetz99](https://github.com/deetz99)! - Remove Alias interface and replace with NameTranslation. Add cloneDeep to auto imports. Create name translation formatter utils'. Replace formatter structuredClone's with cloneDeep. Organize formatters directory.
+
+- [#553](https://github.com/bcgov/business-ui/pull/553) [`f98e0c6`](https://github.com/bcgov/business-ui/commit/f98e0c64e171acfe7cd3c8ea1cf9afeb31027d4b) Thanks [@deetz99](https://github.com/deetz99)! - FormCourtOrderPoaFull - Allow download of all uploaded files, validate pdf letter size and encryption, increase doc query cache stale time, remove hard delete of newly added files unless during the same form session, fix equality check on change, add correct filing name to table'
+
+- [#557](https://github.com/bcgov/business-ui/pull/557) [`9204bb7`](https://github.com/bcgov/business-ui/commit/9204bb74c53239a4d2df731e09cba72a53635065) Thanks [@eve-git](https://github.com/eve-git)! - ManageParties — support ceased directors in the manage component.
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`d78fb98`](https://github.com/bcgov/business-ui/commit/d78fb9834ad6531dc5534a1cc32f6dd5d62f37f0) Thanks [@eve-git](https://github.com/eve-git)! - **PartyDetails**: Added an Email Address section, shown and required automatically for parties holding a role configured in `ROLE_ADDITIONAL_FIELDS` (currently Director), mirroring the existing effective-date-by-role pattern.
+  
+  - Added `FormPartyEmail` component and `getPartyEmailSchema` (required/max-254-chars/valid-format validation, in that priority order).
+  - Added `PartySchema.email` and wired it through `formatPartyUi`/`formatRelationshipUi`/`formatRelationshipApi`.
+  - Added `ManageAllowedAction.EMAIL_CHANGE`.
+  - Consolidated the per-role additional-field config (`ROLES_REQUIRING_EFFECTIVE_DATE`) and the new email rules into a single `ROLE_ADDITIONAL_FIELDS` map with independent `showEmail`/`requireEmail`/`effectiveDate` flags per role.
+
+- [#547](https://github.com/bcgov/business-ui/pull/547) [`4af0baa`](https://github.com/bcgov/business-ui/commit/4af0baa6012c34d1f4a34eef50ea386758b07b5b) Thanks [@deetz99](https://github.com/deetz99)! - Amalgamation correct schema and sub form. Business extended query, service wrapper and types.
+
+### Patch Changes
+
+- [#562](https://github.com/bcgov/business-ui/pull/562) [`a6348c5`](https://github.com/bcgov/business-ui/commit/a6348c5256e25830ea7e842262592f36f55e879a) Thanks [@eve-git](https://github.com/eve-git)! - FormEffectiveDateRange - show the date format hint once below both date fields, with each field showing only its own error message
+
+- [#555](https://github.com/bcgov/business-ui/pull/555) [`629ea36`](https://github.com/bcgov/business-ui/commit/629ea36f209fa309040e247e1b6b483a533638a2) Thanks [@kialj876](https://github.com/kialj876)! - Court Order component updates to support stand alone court order filing
+
+- [#544](https://github.com/bcgov/business-ui/pull/544) [`332461e`](https://github.com/bcgov/business-ui/commit/332461edd2efb9b9fd1cf0f8dc49f995a2c619e0) Thanks [@kialj876](https://github.com/kialj876)! - Chore: update sbc-connect/nuxt-pay, consume login description tweak
+
+- [#554](https://github.com/bcgov/business-ui/pull/554) [`8899d0c`](https://github.com/bcgov/business-ui/commit/8899d0cf42344b7f209fda248abf52c2ea6e6cc5) Thanks [@eve-git](https://github.com/eve-git)! - ManageShareStructure - show the resolution/court order date input in correction filings any time collection is enabled, not only when share classes were changed in the current session.
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`16bc2b9`](https://github.com/bcgov/business-ui/commit/16bc2b9b0b1ad6d2da35d0f1379325249364bcaa) Thanks [@eve-git](https://github.com/eve-git)! - Fixed an issue where a new party could retain the previous party’s effective date because the role state was being reused and mutated.
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`5e14cc6`](https://github.com/bcgov/business-ui/commit/5e14cc6e9892ceb3bc5329d76e8006d2f823c4f9) Thanks [@eve-git](https://github.com/eve-git)! - Replace the ConnectInputDate component used for the Delay of Dissolution date with ConnectInputDatePicker.
+
+- [#569](https://github.com/bcgov/business-ui/pull/569) [`aed242b`](https://github.com/bcgov/business-ui/commit/aed242bf3fb33b358eec6be18d6067b76939aa31) Thanks [@deetz99](https://github.com/deetz99)! - Create formatShareClassesSection util, remove now obsolete formatShareClassesUi util.
+
+- [#540](https://github.com/bcgov/business-ui/pull/540) [`b52089d`](https://github.com/bcgov/business-ui/commit/b52089de0a5bd127a9528896829a42bc09ade8cb) Thanks [@eve-git](https://github.com/eve-git)! - Upgrade @sbc-connect/nuxt-pay to fix Safari date picker tab navigation issue.
+
+## 0.26.0
+
+### Minor Changes
+
+- [#523](https://github.com/bcgov/business-ui/pull/523) [`843d384`](https://github.com/bcgov/business-ui/commit/843d3849d063389a43b590247275c9ffb6dfe3b0) Thanks [@eve-git](https://github.com/eve-git)! - Improve effective date input behavior and accessibility based on UX review.
+
+### Patch Changes
+
+- [#529](https://github.com/bcgov/business-ui/pull/529) [`0300b39`](https://github.com/bcgov/business-ui/commit/0300b390f84e9be2c8c7e16486c2240195c71703) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - Allow lower case letter in staff payment DAT number and upper case it when submitting.
+
+## 0.25.0
+
+### Minor Changes
+
+- [#526](https://github.com/bcgov/business-ui/pull/526) [`37b0336`](https://github.com/bcgov/business-ui/commit/37b0336ef20d95bb6c3033362f7f8e3b448b3d78) Thanks [@deetz99](https://github.com/deetz99)! - ### Components
+
+  - **New** - `TableCourtOrder` table component and column utilities
+  - **New** - `ManageCourtOrders` feature component
+
+  ### Composables
+
+  - `useManageCourtOrders`
+    - Table state management
+    - Methods for add, edit, remove, and undo actions
+
+  ### Schemas & Models
+
+  - Update court order Zod schemas to align with JSON schema and form models
+
+  ### Services
+
+  - Add court orders query hook, service abstraction, and API interface
+
+  ### Utils & i18n
+
+  - Add `isEqualOmit` object comparison utility
+  - Add court order i18n translation keys
+
+- [#517](https://github.com/bcgov/business-ui/pull/517) [`d061d55`](https://github.com/bcgov/business-ui/commit/d061d55c75a28c38d4a1abc0c10726e52e07fa54) Thanks [@deetz99](https://github.com/deetz99)! - ### Components
+
+  - **New** - Resolution date sub form
+  - **New** - HelpExpansion
+  - **New** - SubFormFieldWrapper
+  - `ManageShareStructure` - Add resolution date components and methods
+  - `BusinessTable` - Add `hideTableHeader` and `trDividerFullWidth` props
+
+  ### Composables
+
+  - `useManageShareStructure`
+    - Rename `tableState` ref -> `shareClasses`
+    - Add `resolutionDates` ref
+    - Add resolution date methods
+
+  ### Utils
+
+  - Add resolution table columns configurations
+  - Add resolution date Zod validation schema
+
+  ### Services
+
+  - Add resolutions query hook, query options, and API service methods
+
+- [#519](https://github.com/bcgov/business-ui/pull/519) [`39f5948`](https://github.com/bcgov/business-ui/commit/39f59482f49a980ea138447f7732a56c717d6233) Thanks [@deetz99](https://github.com/deetz99)! - Minor styling updates in ShareStructure and Business table components. Resolution date formatters'
+
+- [#518](https://github.com/bcgov/business-ui/pull/518) [`e250207`](https://github.com/bcgov/business-ui/commit/e2502073edfea0c8c98ee9420400bc8ad1074dec) Thanks [@eve-git](https://github.com/eve-git)! - Create an effective date component and add it to directors.
+
+- [#513](https://github.com/bcgov/business-ui/pull/513) [`5124bf6`](https://github.com/bcgov/business-ui/commit/5124bf6045d1de97c809ea6a60173134995ed588) Thanks [@deetz99](https://github.com/deetz99)! - Fix type errors around share class formatters. Update Nuxt to latest. Update connect-pay to pull in ts fixes.
+
+- [#520](https://github.com/bcgov/business-ui/pull/520) [`13f39b9`](https://github.com/bcgov/business-ui/commit/13f39b9fc61c82adcc4fc9e5b3dfd875d650b8dd) Thanks [@deetz99](https://github.com/deetz99)! - Create component for correcting a court order filing, update schema to support form component, create service method to post document.
+
+- [#521](https://github.com/bcgov/business-ui/pull/521) [`b4b40b5`](https://github.com/bcgov/business-ui/commit/b4b40b579d401e332c2652794038e1027c46e8e0) Thanks [@eve-git](https://github.com/eve-git)! - Support Configurable Effective Dates by Role
+
+- [#524](https://github.com/bcgov/business-ui/pull/524) [`ae7f2b0`](https://github.com/bcgov/business-ui/commit/ae7f2b0b574b159604649bf39126a51be1778830) Thanks [@deetz99](https://github.com/deetz99)! - Add badgeOrientation prop to TableColumnIdentity component. Fix cell alignment and make badges horizontal in ResolutionDate table.
+
+- [#527](https://github.com/bcgov/business-ui/pull/527) [`be0f76e`](https://github.com/bcgov/business-ui/commit/be0f76e51cefb7e6e76e54af06889d9feaf94b13) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - ### Composables
+
+  - **New** - useBusinessStateReason: historical state reason text (amalgamation, dissolution, continuation out, put back off) with tombstone integration
+
+  ### Services
+
+  - getFiling / filing query / keys.filing: added `publicData` flag (fetches `?public=true` view of a filing; query key now ends with `{ publicData }`)
+
+  ### Interfaces
+
+  - BusinessDataPublic: added amalgamatedInto and stateFiling fields
+  - **New** - FilingGetByIdPublicResponse, PublicStateFilingBody, BusinessAmalgamatedInto
+
+## 0.24.0
+
+### Minor Changes
+
+- [#514](https://github.com/bcgov/business-ui/pull/514) [`6e117b3`](https://github.com/bcgov/business-ui/commit/6e117b3f111d190e0712943e781d6f9d075932c2) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - Show comments that are part of a filing in their own Filing Detail section in the business ledger, separate from staff detail comments and excluded from the Details count.
+
+- [#511](https://github.com/bcgov/business-ui/pull/511) [`d0b514f`](https://github.com/bcgov/business-ui/commit/d0b514f384d45782852892f66b749745bbb6f693) Thanks [@deetz99](https://github.com/deetz99)! - BREAKING CHANGE: remove useDocumentRecordServiceApi and replace with useDrsService. Fix: Several type errors and missing interfaces.
+
+- [#510](https://github.com/bcgov/business-ui/pull/510) [`03c57c2`](https://github.com/bcgov/business-ui/commit/03c57c224bdc71a054bc7352bf33709de12244c2) Thanks [@vysakh-menon-aot](https://github.com/vysakh-menon-aot)! - exclude isEditing from comparison in share structure
+
+## 0.23.0
+
+### Minor Changes
+
+- [#508](https://github.com/bcgov/business-ui/pull/508) [`381f03b`](https://github.com/bcgov/business-ui/commit/381f03b7be813427a30bad5f4974bbc14e0c5e4e) Thanks [@deetz99](https://github.com/deetz99)! - Create useIsStaff composable, add staff breadcrumbs to useFilingNavigation composable.
+
+- [#506](https://github.com/bcgov/business-ui/pull/506) [`820e46e`](https://github.com/bcgov/business-ui/commit/820e46e7e0284db4237c8552fc437b16daaca668) Thanks [@vysakh-menon-aot](https://github.com/vysakh-menon-aot)! - Generate a new UUID for any share class with a null id as part of the draft filings formatter.
+
+## 0.22.0
+
+### Minor Changes
+
+- [#489](https://github.com/bcgov/business-ui/pull/489) [`b8efd28`](https://github.com/bcgov/business-ui/commit/b8efd28bcd143bb3c990f5e9697d6ff0f0c1b47c) Thanks [@vysakh-menon-aot](https://github.com/vysakh-menon-aot)! - - Update responsive breakpoints for SubForm Wrapper
+
+  - Add support for hiding actions in `correct-readonly` variant in ManageNameTranslations and ManageOffices
+  - Add prop to optionally hide empty text in business tables
+
+- [#495](https://github.com/bcgov/business-ui/pull/495) [`eb37022`](https://github.com/bcgov/business-ui/commit/eb3702223e84436eee6ada31fd68f6d06716c137) Thanks [@deetz99](https://github.com/deetz99)! - Update connect-pay dependency.
+
+- [#492](https://github.com/bcgov/business-ui/pull/492) [`f846072`](https://github.com/bcgov/business-ui/commit/f846072b8beb442742e5ccf1418d31cb5f4b35f2) Thanks [@deetz99](https://github.com/deetz99)! - Update connect-pay dependency.
+
+- [#493](https://github.com/bcgov/business-ui/pull/493) [`7502da0`](https://github.com/bcgov/business-ui/commit/7502da07a1cd436da50f114431a1edf21e4cf9a7) Thanks [@deetz99](https://github.com/deetz99)! - Update connect-pay dependency.
+
+- [#490](https://github.com/bcgov/business-ui/pull/490) [`b490fd5`](https://github.com/bcgov/business-ui/commit/b490fd564813d8d6858bf60569f975ef76c239db) Thanks [@vysakh-menon-aot](https://github.com/vysakh-menon-aot)! - update spacing in manage company name component
+
+- [#482](https://github.com/bcgov/business-ui/pull/482) [`4ea6d87`](https://github.com/bcgov/business-ui/commit/4ea6d87f0a116be6f2131ccadbabcddf56be40e4) Thanks [@vysakh-menon-aot](https://github.com/vysakh-menon-aot)! - UX feedback updates for the correction filing flow
+
+  - Added cross-section `preventActions` + `actionPreventedSignal` props to `ManageParties`, `ManageOffices`, `ManageShareStructure`, `ManageNameTranslations`, and `ManageCompanyName` so that opening a sub-form in any one section blocks edits in all other sections
+  - Each manage component now emits `action-prevented` and propagates it up to the correction step, which increments a shared signal to trigger the correct inline alert in the active section
+  - Fixed `setActiveFormAlert` in all manage components to only fire when the component's own sub-form is open, preventing false alerts on sibling sections
+  - Wrapped the company name display and edit area in a `pointerdown`/`keydown` listener that clears stale button-control and filing alerts before a new interaction
+  - Passed `variant` and `subject` props through to `FormBusinessName` inside `ManageCompanyName`, and aligned the dropdown menu to `end` to fix overflow clipping
+  - Refactored `FormBusinessName` template to use `SubFormWrapper` (replacing the manual Cancel/Done button row), making the form header and action buttons consistent with other sub-forms
+  - Increased sub-form header font size to `text-lg` and reduced the task-guard alert text to `text-sm` in `SubFormWrapper` for better visual hierarchy
+  - Fixed the table row separator in `TableBusiness` to hide on expanded rows (`data-[expanded=true]:after:hidden`), removing the double-border when a sub-form is open
+  - Adjusted name translation table column padding (`pl-0 pr-2` for name, `pl-2 pr-0` for actions) to tighten the layout
+  - Bumped `@sbc-connect/nuxt-pay` to `0.4.0` (pulls in `nuxt-auth@0.11.1`, `nuxt-base@0.10.0`, `nuxt-forms@0.7.5`)
+
+- [#486](https://github.com/bcgov/business-ui/pull/486) [`b89a2c3`](https://github.com/bcgov/business-ui/commit/b89a2c3d4f2f08e1fe48527f764e622b9a91ac7f) Thanks [@eve-git](https://github.com/eve-git)! - Update Certify and Authentication components
+
+### Patch Changes
+
+- [#500](https://github.com/bcgov/business-ui/pull/500) [`c45d70a`](https://github.com/bcgov/business-ui/commit/c45d70abda27c7d80a467bb15efb2c76b2087ea2) Thanks [@mruff-aeq](https://github.com/mruff-aeq)! - Update completed Continuation Out text to state the corporation is no longer a company in British Columbia under the Business Corporations Act.
+
+- [#502](https://github.com/bcgov/business-ui/pull/502) [`ffa3656`](https://github.com/bcgov/business-ui/commit/ffa36560f63e8158ae79a366443b581d89ee4acd) Thanks [@deetz99](https://github.com/deetz99)! - Update connect-pay dependency
+
 ## 0.21.1
 
 ### Patch Changes

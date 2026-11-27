@@ -2,10 +2,9 @@ import { z } from 'zod'
 
 function getClientTransitionSchema() {
   return z.object({
-    certify: getCertifySchema().default({
-      isCertified: false,
-      legalName: ''
-    }),
+    certify: getCertifySchema().default(() => ({
+      isCertified: false
+    })),
     folio: getFolioSchema().default({ folioNumber: '' })
   })
 }
@@ -31,8 +30,7 @@ export function getTransitionSchema(isStaff: boolean) {
   const schema = z.object({
     documentDelivery: getDocumentDeliverySchema().default(() => ({ completingPartyEmail: '' })),
     activeDirector: getActivePartySchema(),
-    activeClass: getActiveShareClassSchema(),
-    activeSeries: getActiveShareSeriesSchema(),
+    activeShareStructure: getActiveShareStructureSchema(),
     confirmOffices: z.boolean()
       .default(true)
       .refine(val => val === true),
@@ -52,8 +50,7 @@ export function getTransitionStep1Schema() {
   const t = useNuxtApp().$i18n.t
   return z.object({
     activeDirector: getActivePartySchema(),
-    activeClass: getActiveShareClassSchema(),
-    activeSeries: getActiveShareSeriesSchema(),
+    activeShareStructure: getActiveShareStructureSchema(),
     confirmOffices: z.boolean()
       .default(true)
       .refine(val => val === true, t('connect.validation.required')),

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export * from './email'
+export * from './liquidator-appointment'
 export * from './name'
 export * from './roles'
 
@@ -37,7 +39,8 @@ export function getPartySchema(roleType?: RoleTypeUi) {
       preferredName: ''
     }),
     roles: getPartyRoleSchema(roleType),
-    id: z.string().optional().default(() => ''),
+    email: z.string().default(''),
+    id: z.string().default(() => crypto.randomUUID()),
     isEditing: z.boolean().default(false)
   })
 }

@@ -18,22 +18,33 @@ export const useBusinessQueryKeys = () => {
   const base = computed(() => ['business', currentAccount.value.id] as const)
 
   const keys = {
-    addresses: (businessId: string) => [...base.value, businessId, 'addresses'] as const,
+    addresses: (businessId: string, query?: BusinessAddressesQuery) =>
+      [...base.value, businessId, 'addresses', { ...query }] as const,
     aliases: (businessId: string) => [...base.value, businessId, 'aliases'] as const,
     authInfo: (businessId: string) => [...base.value, businessId, 'auth-info'] as const,
     authorizedActions: (businessId: string) => [...base.value, businessId, 'authorized-actions'] as const,
     business: (businessId: string, slim: boolean, publicData: boolean) =>
       [...base.value, businessId, 'information', { slim, publicData }] as const,
+    businessExt: (businessId: string, forCorrection: boolean, filingType?: FilingType) =>
+      [...base.value, businessId, 'information-ext', { forCorrection, filingType }] as const,
     bootstrapFiling: (tempRegId: string) => [...base.value, tempRegId, 'bootstrap-filing'] as const,
+    courtOrders: (businessId: string) => [...base.value, businessId, 'court-orders'] as const,
     document: (url: string) => [...base.value, 'document', { url }] as const,
-    filing: (businessId: string, filingId: number | string) => [...base.value, businessId, 'filing', filingId] as const,
+    filing: (businessId: string, filingId: number | string, publicData = false) =>
+      [...base.value, businessId, 'filing', filingId, { publicData }] as const,
+    filingChanges: (businessId: string, filingId: number | string) =>
+      [...base.value, businessId, 'filing', filingId, 'changes'] as const,
     filingComments: (url: string) => [...base.value, 'filing', 'comments', { url }] as const,
     filingDocumentUrls: (businessId: string, filingId: string | number) =>
       [...base.value, businessId, 'filing', filingId, 'document-urls'] as const,
+    filingValidateSection: (businessId: string, payload: FilingValidateSectionRequest) =>
+      [...base.value, businessId, 'filing', 'validate', 'section', payload] as const,
     ledger: (businessId: string, date: string) => [...base.value, businessId, 'ledger', { date }] as const,
     linkedNameRequest: (nrNumber: string) => [...base.value, 'linked-name-request', nrNumber] as const,
-    parties: (businessId: string, query?: Record<string, unknown>) =>
+    parties: (businessId: string, query?: BusinessPartiesQuery) =>
       [...base.value, businessId, 'parties', { ...query }] as const,
+    resolutions: (businessId: string, isSpecial: boolean) =>
+      [...base.value, businessId, 'resolutions', { isSpecial }] as const,
     shareClasses: (businessId: string, classId?: string | number) =>
       [...base.value, businessId, 'share-classes', classId ?? null] as const,
     tasks: (businessId: string) => [...base.value, businessId, 'tasks'] as const

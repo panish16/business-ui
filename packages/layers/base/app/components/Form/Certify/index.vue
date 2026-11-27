@@ -18,7 +18,7 @@ const formError = computed<FormError | undefined>(() => {
   return errors?.find(e => e.name === 'isCertified')
 })
 
-const today = getToday('America/Vancouver')
+const today = getToday()
 
 defineExpose({
   formRef
@@ -44,7 +44,7 @@ defineExpose({
         :label="$t('label.certify')"
         :error="formError"
         :show-error-msg="true"
-        padding-class="p-6"
+        padding-class="padding-x-default py-8"
         data-testid="certify-section"
       >
         <UFormField

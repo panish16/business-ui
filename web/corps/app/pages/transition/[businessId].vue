@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { FormErrorEvent } from '@nuxt/ui'
 import type { FetchError } from 'ofetch'
-import type { FormTransitionStep1 } from '#components'
 import { omit } from 'es-toolkit'
 
 const { t } = useI18n()
@@ -17,7 +16,6 @@ const {
   handleButtonLoading,
   setAlertText: setBtnCtrlAlert
 } = useConnectButtonControl()
-const step1Ref = useTemplateRef<InstanceType<typeof FormTransitionStep1>>('step-1-ref')
 
 const businessId = route.params.businessId as string
 const FILING_TYPE = FilingType.TRANSITION
@@ -50,15 +48,20 @@ useHead({
 function checkActiveSubForm() {
   const hasActiveSubForm
     = (store.formState.activeDirector && setPartiesAlert('party-details-form', t('text.finishTaskBeforeOtherChanges')))
-      || (store.formState.activeClass && setSharesAlert('share-class-form', t('text.finishTaskBeforeOtherChanges')))
-      || (store.formState.activeSeries && setSharesAlert('share-series-form', t('text.finishTaskBeforeOtherChanges')))
+      || (
+        store.formState.activeShareStructure
+        && setSharesAlert('share-class-form', t('text.finishTaskBeforeOtherChanges'))
+      )
+      || (
+        store.formState.activeShareStructure
+        && setSharesAlert('share-series-form', t('text.finishTaskBeforeOtherChanges'))
+      )
 
   return hasActiveSubForm
 }
 
 async function reviewAndConfirm() {
   try {
-    await step1Ref.value?.formRef?.validate()
     if (checkActiveSubForm()) {
       return
     }
@@ -76,6 +79,10 @@ async function reviewAndConfirm() {
 }
 
 async function submitFiling() {
+  if (isViewOnly.value) {
+    return
+  }
+
   try {
     handleButtonLoading(true, 'right', 1)
     await store.submit(true)
@@ -86,7 +93,11 @@ async function submitFiling() {
     // in case there was a failure and it saved a draft
     const filingResp = e.response?._data
     const urlParams = useUrlSearchParams()
-    urlParams.draft = String(filingResp?.filing?.header?.filingId)
+    const savedDraftId = filingResp?.filing?.header?.filingId
+    // a response without a filing (eg a stale draft 409) must keep the resumed draft's id in the url
+    if (savedDraftId) {
+      urlParams.draft = String(savedDraftId)
+    }
     modal.openSaveFilingErrorModal(error)
     handleButtonLoading(false)
     initBeforeUnload()
@@ -94,6 +105,10 @@ async function submitFiling() {
 }
 
 async function saveFiling(enableUnsavedChangesBlock = true) {
+  if (isViewOnly.value) {
+    return
+  }
+
   try {
     if (enableUnsavedChangesBlock) {
       if (checkActiveSubForm()) {
@@ -121,15 +136,17 @@ async function cancelFiling() {
   await navigateTo(dashboardUrl.value, { external: true })
 }
 
-const { currentStep, nextStep } = useFilingPageWatcher({
+const { currentStep, nextStep, viewOnly: isViewOnly } = useFilingPageWatcher({
   store,
   businessId,
   filingSubType: undefined,
   filingType: FILING_TYPE,
   draftId: urlParams.draft as string | undefined,
+  filedByStaff: () => store.draftFilingState.filedByStaff,
+  viewOnlyBackButton: { onClick: () => navigateTo(dashboardUrl.value, { external: true }) },
   breadcrumbs,
   setOnBeforeSessionExpired: async () => {
-    if (canSave()) {
+    if (!isViewOnly.value && canSave()) {
       await saveFiling(false)
     }
   },
@@ -140,7 +157,12 @@ const { currentStep, nextStep } = useFilingPageWatcher({
   steps: [
     {
       cancelFiling: { class: 'min-w-[300px] justify-center' },
-      submitFiling: { label: t('label.reviewAndConfirm'), onClick: reviewAndConfirm }
+      submitFiling: {
+        label: t('label.reviewAndConfirm'),
+        form: 'transition-filing-step-1',
+        type: 'submit',
+        onClick: undefined
+      }
     },
     { submitFiling: { form: 'transition-filing-step-2', type: 'submit' } }
   ],
@@ -160,14 +182,16 @@ const { currentStep, nextStep } = useFilingPageWatcher({
         translation-path="page.transition.desc"
       />
     </div>
+    <AlertDraftRebase />
     <FormTransitionStep1
       v-if="currentStep === 1"
       id="transition-filing-step-1"
-      ref="step-1-ref"
+      @submit="reviewAndConfirm"
     />
     <FormTransitionStep2
       v-if="currentStep === 2"
       id="transition-filing-step-2"
+      :view-only="isViewOnly"
       @submit="submitFiling"
     />
   </div>

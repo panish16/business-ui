@@ -559,6 +559,7 @@ export default {
     manageBusiness: 'Gérer les Affaires',
     cancelRequest: 'Annuler la Demande',
     amalgamateNowShortForm: 'Fusionner Maintenant (Forme Courte)',
+    viewAccess: "Voir l'Accès",
     noAffiliationRecords: {
       line1: "Vous n'avez aucune entreprise répertoriée.",
       line2: 'Récupérez une entreprise existante ou une demande de nom active à partir du champ de recherche ci-dessus.'
@@ -580,7 +581,13 @@ export default {
   modal: {
     addBusinessSuccess: {
       title: 'Succès! {name} a été ajoutée à votre compte.',
-      description: 'Vous pouvez maintenant gérer votre entreprise à partir de votre liste en utilisant votre compte BC Registries.',
+      description: [
+        'Gérez cette entreprise dès maintenant ou retrouvez-la dans votre liste d’entreprises à tout moment.',
+        'Ajoutez cette page à vos favoris pour accéder à votre entreprise à l’avenir.'
+      ],
+      important: 'Important :',
+      migrationWarning: 'Veuillez vérifier les renseignements migrés de {name} et corriger toute erreur survenue pendant le transfert.',
+      reviewNow: 'Vérifier maintenant',
       manageBusiness: 'Gérer L\'Entreprise'
     },
     manageBusiness: {
@@ -778,6 +785,11 @@ export default {
     },
     help: {
       title: "Vue d'Ensemble du Rapport Annuel - Rapport Annuel de Service CB"
+    },
+    viewAccess: {
+      title: "Voir l'Accès - Mon Registre d'Entreprise",
+      h1: "Voir l'Accès",
+      intro: 'Liste des comptes BC Registries qui ont accès à consulter et gérer cette entreprise.'
     }
   },
   search: {
@@ -799,6 +811,15 @@ export default {
     }
   },
   table: {
+    authorizedAccounts: {
+      title: 'Comptes Autorisés ({count})',
+      columns: {
+        accountName: 'Nom du Compte',
+        dateAdded: "Date d'Ajout"
+      },
+      empty: "Aucun compte n'a accès à cette entreprise.",
+      error: "Nous n'avons pas pu charger les comptes ayant accès à cette entreprise. Veuillez réessayer plus tard."
+    },
     affiliation: {
       filter: {
         busName: {

@@ -49,10 +49,11 @@ export const useBusinessService = () => {
   /**
    * Fetches business addresses by its business identifier.
    * @param businessId the identifier of the business
+   * @param addressQuery the query to add to the request (e.g., { date: '2026-01-01' } for as-of-date addresses)
    * @returns a promise to return the addresses for this business
    */
-  async function getAddresses(businessId: string, force = false) {
-    const options = query.addressesOptions(businessId)
+  async function getAddresses(businessId: string, addressQuery?: BusinessAddressesQuery, force = false) {
+    const options = query.addressesOptions(businessId, addressQuery)
     return await getCachedOrFetch<ApiEntityOfficeAddress>(options, force)
   }
 
@@ -84,7 +85,7 @@ export const useBusinessService = () => {
     filingName: FilingType,
     force = false
   ): Promise<FilingGetByIdResponse<F>> {
-    const options = query.filingOptions<F>(businessId, draftId)
+    const options = query.filingOptions<F>(businessId, draftId, false)
     const result = await getCachedOrFetch(options, force)
 
     const isValid = isValidDraft<F>(filingName, result)
@@ -137,6 +138,16 @@ export const useBusinessService = () => {
       .then(res => res.business)
   }
 
+  async function getBusinessExtended(
+    businessId: string,
+    // forCorrection: boolean = false,
+    // filingType?: FilingType,
+    force = false
+  ): Promise<BusinessDataExtended> {
+    const options = query.businessExtOptions(businessId, true, undefined) // forCorrection, filingType - FUTURE: type properly with TS overloads
+    return await getCachedOrFetch<BusinessDataExtended>(options, force)
+  }
+
   /**
    * Fetches a bootstrap filing by its temporary business identifier.
    * @param tempRegId the temporary identifier of the business
@@ -155,6 +166,19 @@ export const useBusinessService = () => {
   }
 
   /**
+   * Fetches all court orders that have been filed against a business.
+   * @param businessId the identifier of the business.
+   * @returns An array of Court Order objects.
+  */
+  async function getCourtOrders(
+    businessId: string,
+    force = false
+  ): Promise<CourtOrderResponse[]> {
+    const options = query.courtOrdersOptions(businessId)
+    return await getCachedOrFetch(options, force).then(res => res.courtOrders)
+  }
+
+  /**
    * Fetches documents object.
    * @param url the full URL to fetch the documents
    * @param options the options to fetch the documents
@@ -169,14 +193,39 @@ export const useBusinessService = () => {
    * Fetches a filing by its id.
    * @param businessId the identifier of the business
    * @param filingId the id of the filing
+   * @param publicData whether to fetch the public (unauthenticated) view of the filing
    * @returns a promise to return the filing
    */
+  function getFiling(
+    businessId: string, filingId: number | string, publicData: true, force?: boolean
+  ): Promise<FilingGetByIdPublicResponse>
+  function getFiling<F extends FilingRecord>(
+    businessId: string, filingId: number | string, publicData?: false, force?: boolean
+  ): Promise<FilingGetByIdResponse<F>>
+  function getFiling<F extends FilingRecord>(
+    businessId: string, filingId: number | string, publicData: boolean, force?: boolean
+  ): Promise<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse>
   async function getFiling<F extends FilingRecord>(
     businessId: string,
     filingId: number | string,
+    publicData = false,
     force = false
-  ): Promise<FilingGetByIdResponse<F>> {
-    const options = query.filingOptions<F>(businessId, filingId)
+  ): Promise<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse> {
+    const options = query.filingOptions<F>(businessId, filingId, publicData)
+    return await getCachedOrFetch(options, force)
+  }
+
+  /**
+   * Fetches the draft rebase changes report.
+   * - what completed since the draft's base, and the draft edits that collide with it
+   * - always fresh unless `force` is false
+   */
+  async function getFilingChanges(
+    businessId: string,
+    filingId: number | string,
+    force = true
+  ): Promise<DraftChangesReport> {
+    const options = query.filingChangesOptions(businessId, filingId)
     return await getCachedOrFetch(options, force)
   }
 
@@ -237,6 +286,16 @@ export const useBusinessService = () => {
     return await getCachedOrFetch(options, force)
   }
 
+  async function getResolutions(
+    businessId: string,
+    isSpecial = false,
+    force = false
+  ): Promise<Resolution[]> {
+    const options = query.resolutionsOptions(businessId, isSpecial)
+    return await getCachedOrFetch<{ resolutions: Resolution[] }>(options, force)
+      .then(res => res.resolutions)
+  }
+
   /**
    * Fetches business share classes.
    * @param businessId the business identifier (aka entity inc no)
@@ -274,11 +333,73 @@ export const useBusinessService = () => {
    */
   async function getParties(
     businessId: string,
-    partyQuery?: Record<string, unknown>,
+    partyQuery?: BusinessPartiesQuery,
     force = false
   ): Promise<OrgPerson[]> {
     const options = query.partiesOptions(businessId, partyQuery)
     return await getCachedOrFetch(options, force).then(res => res.parties)
+  }
+
+  /**
+   * Deletes a document in the DRS via the business API client endpoint
+   * @param fileKey - The document key in DRS to be deleted
+   * @param throwOnError - Set to true to throw request errors, defaults to false
+   * @returns void
+   */
+  function deleteDocument(fileKey?: string, throwOnError = false) {
+    if (!fileKey) {
+      return
+    }
+    return $businessApi(`documents/client/${fileKey}`, { method: 'DELETE' })
+      .catch((e) => {
+        if (throwOnError) {
+          throw e
+        }
+      })
+  }
+
+  /**
+   * Submits a document to the Legal API which will be uploaded to the DRS.
+   * @param identifier The business identifier.
+   * @param file The file to upload
+   * @param filingType The filing this document is associated with eg courtOrder
+   * @param entityType The business entity type
+   * @param documentType The document type eg court_order
+   * @param filingId The filing ID this document is associated with, optional
+   * @returns A promise that resolves the response from the DRS
+  */
+  async function postDocument(
+    file: File,
+    options: {
+      filingType: FilingType
+      entityType: CorpTypeCd
+      documentType: DocumentTypeClient
+      identifier?: string
+      filingId?: string | number
+      signal?: AbortSignal
+    }
+  ): Promise<DocumentUploadResponse> {
+    const {
+      documentType,
+      filingType,
+      entityType,
+      identifier = '',
+      filingId,
+      signal
+    } = options
+
+    return $businessApi(`documents/client/${filingType}/${entityType}/${documentType}`,
+      {
+        method: 'POST',
+        body: file,
+        query: {
+          filename: file.name,
+          businessIdentifier: identifier,
+          filingId: (filingId && Number(filingId)) || undefined
+        },
+        signal
+      }
+    )
   }
 
   /**
@@ -310,6 +431,7 @@ export const useBusinessService = () => {
     * @param body The data payload for the filing creation.
     * @param isSubmission - If false, the filing is saved as draft. If true, it is submitted as final.
     * @param filingId - The filing Id to submit the PUT request against. Will submit a POST request if undefined.
+    * @param opts.baseTransactionId - Rebase watermark (PUT only): advanced, or 409 if a filing completed since.
     *
     * @returns A promise that resolves the API response.
   */
@@ -319,13 +441,15 @@ export const useBusinessService = () => {
     body: FilingSubmissionBody<F>,
     isSubmission: boolean,
     filingId: string | number,
-    headers?: HeadersInit
+    opts?: { baseTransactionId?: number, headers?: HeadersInit }
   ): Promise<FilingPutResponse<F>>
   // will return Promise<FilingPostResponse<F> if no filingId is provided
   async function saveOrUpdateDraftFiling<F extends FilingRecord>(
     identifier: string,
     body: FilingSubmissionBody<F>,
-    isSubmission: boolean
+    isSubmission: boolean,
+    filingId?: undefined,
+    opts?: { baseTransactionId?: number, headers?: HeadersInit }
   ): Promise<FilingPostResponse<F>>
   // main function
   async function saveOrUpdateDraftFiling<F extends FilingRecord>(
@@ -333,14 +457,18 @@ export const useBusinessService = () => {
     body: FilingSubmissionBody<F>,
     isSubmission = false,
     filingId?: string | number,
-    headers?: HeadersInit
+    opts?: { baseTransactionId?: number, headers?: HeadersInit }
   ): Promise<FilingPutResponse<F> | FilingPostResponse<F>> {
     const url = filingId
       ? `businesses/${identifier}/filings/${filingId}`
       : `businesses/${identifier}/filings`
     const method = filingId ? 'PUT' : 'POST'
-    const query = isSubmission ? undefined : { draft: true }
-    headers = headers ? headers : {}
+    const queryParams = {
+      ...(isSubmission ? {} : { draft: true }),
+      ...(filingId && opts?.baseTransactionId !== undefined ? { baseTransactionId: opts.baseTransactionId } : {})
+    }
+    const query = Object.keys(queryParams).length ? queryParams : undefined
+    const headers = opts?.headers ?? {}
 
     return $businessApi(url,
       {
@@ -362,6 +490,23 @@ export const useBusinessService = () => {
     return $businessApi(`businesses/${businessId}/filings/${filingId}`, { method: 'DELETE' })
   }
 
+  /**
+   * Validate a specific section of filing data.
+   *
+   * @param businessId The identifier of the business (e.g., BC1234567).
+   * @param payload The section validation payload containing filing type, section, and data.
+   * @param force Whether to bypass any cached results and force a fresh fetch.
+   * @returns A promise resolving to the section validation result and errors.
+   */
+  async function validateFilingSection(
+    businessId: string,
+    payload: FilingValidateSectionRequest,
+    force = false
+  ): Promise<FilingValidateSectionResponse> {
+    const options = query.filingValidateSectionOptions(businessId, payload)
+    return await getCachedOrFetch(options, force)
+  }
+
   return {
     // GETs
     getAddresses,
@@ -370,19 +515,26 @@ export const useBusinessService = () => {
     getAuthInfo,
     getAuthorizedActions,
     getBusiness,
+    getBusinessExtended,
     getBootstrapFiling,
+    getCourtOrders,
     getDocument,
     getFiling,
+    getFilingChanges,
     getFilingComments,
     getFilingDocumentUrls,
     getLedger,
     getLinkedNameRequest,
+    getResolutions,
     getShareClasses,
     getTasks,
     getParties,
     // ...rest
+    deleteDocument,
+    postDocument,
     postFiling,
     saveOrUpdateDraftFiling,
-    deleteFiling
+    deleteFiling,
+    validateFilingSection
   }
 }

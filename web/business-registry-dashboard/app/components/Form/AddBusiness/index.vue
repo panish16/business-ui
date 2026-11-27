@@ -15,11 +15,13 @@ defineProps<{
     isCoop: boolean
   }
   isCorpOrBenOrCoop: boolean
+  subject: string
 }>()
 
 const emit = defineEmits<{
   emailSuccess: [void]
   passcodeError: [void]
+  addSuccess: [void]
   retry: [void]
 }>()
 
@@ -70,9 +72,11 @@ defineExpose({
       :accounts
       :business-details="businessDetails"
       :is-corp-or-ben-or-coop="isCorpOrBenOrCoop"
+      :subject
       @retry="handleRetry"
       @business-error="handleError"
       @email-success="handleEmailSuccess"
+      @add-success="emit('addSuccess')"
     />
   </transition>
 </template>

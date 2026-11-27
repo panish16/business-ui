@@ -1,6 +1,23 @@
 import { z } from 'zod'
+import { DateTime } from 'luxon'
+import { DATE_API_INPUT_FORMAT } from '#base/app/utils/schemas/date'
 
-export function getShareSeriesSchema(context?: { existingNames: string[], maxAllowedShares: number }) {
+interface ShareSeriesContext {
+  existingNames: string[]
+  maxAllowedShares: number
+}
+
+interface ShareClassContext {
+  existingNames: string[]
+}
+
+interface ResolutionDateContext {
+  hasRightsOrRestrictions?: boolean
+  isEditingExisting?: boolean
+  existingResolutions?: { id: string, date: string, type?: string }[]
+}
+
+export function getShareSeriesSchema(context?: ShareSeriesContext) {
   const t = useNuxtApp().$i18n.t
   return z.object({
     isEditing: z.boolean().default(false),
@@ -65,7 +82,7 @@ export function getActiveShareSeriesSchema(context?: { existingNames: string[], 
 
 export type ActiveShareSeriesSchema = z.output<ReturnType<typeof getActiveShareSeriesSchema>>
 
-export function getShareClassSchema(context?: { existingNames: string[] }) {
+export function getShareClassSchema(context?: ShareClassContext) {
   const t = useNuxtApp().$i18n.t
   return z.object({
     isEditing: z.boolean().default(false),
@@ -200,3 +217,118 @@ export function getActiveShareClassSchema(context?: { existingNames: string[] })
 }
 
 export type ActiveShareClassSchema = z.output<ReturnType<typeof getActiveShareClassSchema>>
+
+export function getResolutionDateSchema(context?: ResolutionDateContext) {
+  const t = useNuxtApp().$i18n.t
+
+  return z.object({
+    id: z.preprocess( // convert DB `id` int to string for UI diff'ing
+      val => (typeof val === 'number' ? String(val) : val),
+      z.string().default(() => crypto.randomUUID())
+    ),
+    type: z.string().optional(),
+    date: z.string().default(''),
+    isEditing: z.boolean().default(false),
+    actions: z.array(z.enum(ActionType)).default(() => [])
+  }).superRefine((data, ctx) => {
+    const date = data.date.trim()
+    const isDateEmpty = date === ''
+
+    // Date required when adding or editing a share class or series with special rights or restrictions
+    if (context?.hasRightsOrRestrictions && isDateEmpty) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['date'],
+        message: t('validation.resolutionDate.requiredWithSpecialRightsOrRestrictions')
+      })
+      return
+    }
+
+    // Date required when editing an existing date
+    if (context?.isEditingExisting && isDateEmpty) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['date'],
+        message: t('connect.validation.fieldRequired')
+      })
+      return
+    }
+
+    // Date must be a valid calendar date in YYYY-MM-DD format
+    // (datepicker outputs this format - fallback check when entered manually)
+    if (!isDateEmpty && !DateTime.fromFormat(date, DATE_API_INPUT_FORMAT).isValid) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['date'],
+        message: t('validation.dateFormat')
+      })
+      return
+    }
+
+    // Prevent duplicate dates being entered unless the IDs match (editing existing date)
+    if (context?.existingResolutions && !isDateEmpty) {
+      const isDuplicate = context.existingResolutions.some(res =>
+        res.date.trim() === date && res.id !== data.id
+      )
+
+      if (isDuplicate) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['date'],
+          message: t('validation.resolutionDate.alreadyAdded')
+        })
+        return
+      }
+    }
+
+    // Date must not be a future date
+    if (!isDateEmpty) {
+      const zone = 'America/Vancouver'
+      const today = DateTime.now().setZone(zone).startOf('day')
+      const inputDatetime = DateTime.fromISO(date, { zone }).startOf('day')
+      if (inputDatetime.isValid && inputDatetime > today) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['date'],
+          message: t('validation.resolutionDate.cantBeInFuture')
+        })
+        return
+      }
+    }
+  })
+}
+
+export type ResolutionDateSchema = z.output<ReturnType<typeof getResolutionDateSchema>>
+
+export function getActiveResolutionDateSchema(context?: {
+  hasRightsOrRestrictions?: boolean
+  isEditingExisting?: boolean
+  existingResolutions?: { id: string, date: string, type?: string }[]
+}) {
+  return getResolutionDateSchema(context).nullable().optional()
+}
+
+export type ActiveResolutionDateSchema = z.output<ReturnType<typeof getActiveResolutionDateSchema>>
+
+export function getActiveShareStructureSchema(context?: {
+  shareClass?: ShareClassContext
+  shareSeries?: ShareSeriesContext
+  resolutionDate?: ResolutionDateContext
+}) {
+  return z.discriminatedUnion('key', [
+    z.object({
+      key: z.literal('shareClass'),
+      value: getShareClassSchema(context?.shareClass)
+    }),
+    z.object({
+      key: z.literal('shareSeries'),
+      value: getShareSeriesSchema(context?.shareSeries)
+    }),
+    z.object({
+      key: z.literal('resolutionDate'),
+      value: getResolutionDateSchema(context?.resolutionDate)
+    })
+  ]).optional()
+}
+
+export type ActiveShareStructureSchema = z.infer<ReturnType<typeof getActiveShareStructureSchema>>

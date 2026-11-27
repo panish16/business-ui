@@ -55,11 +55,11 @@ const corpInfoArray: Array<CorpInfo> = [
     fullDesc: 'BC Community Contribution Company',
     numberedDesc: 'Numbered Community Contribution Company'
   }, {
-    corpTypeCd: CorpTypeCd.CEMETARY,
+    corpTypeCd: CorpTypeCd.CEMETERY,
     colinInd: false,
     corpClass: CorpClass.OT,
-    shortDesc: 'CEMETARY',
-    fullDesc: 'Cemetary'
+    shortDesc: 'CEMETERY',
+    fullDesc: 'Cemetery'
   }, {
     corpTypeCd: CorpTypeCd.COOP,
     colinInd: false,
@@ -342,11 +342,12 @@ export function getCorpInfoObject(cd: CorpTypeCd): CorpInfo | null {
 /**
  * Given corp type code, returns corp full description.
  * @param cd the corp type code to get
- * @returns the description (or '' if not found)
+ * @param fallback returned when the code is unknown or missing (defaults to '')
+ * @returns the description (or the fallback if not found)
  */
-export function getCorpFullDescription(cd: CorpTypeCd): string {
+export function getCorpFullDescription(cd?: CorpTypeCd | string | null, fallback = ''): string {
   const item = corpInfoArray.find(obj => (cd === obj.corpTypeCd))
-  return (item && item.fullDesc) || ''
+  return item?.fullDesc || fallback
 }
 
 /**

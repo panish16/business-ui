@@ -1,23 +1,16 @@
 <script setup lang="ts">
 const { t } = useI18n()
 const store = useCorrectionStore()
-const { initializing } = storeToRefs(store)
 const route = useRoute()
-const { setAlert: setPartiesAlert } = useFilingAlerts('manage-parties')
-const { setAlert: setOfficesAlert } = useFilingAlerts('manage-offices')
-const { setAlert: setReceiversAlert } = useFilingAlerts('manage-receivers')
-const { setAlert: setLiquidatorsAlert } = useFilingAlerts('manage-liquidators')
-const { setAlert: setSharesAlert } = useFilingAlerts('manage-share-structure')
-const { setAlert: setNameTranslationsAlert } = useFilingAlerts('manage-name-translations')
-const { setAlert: setCompanyNameAlert } = useFilingAlerts('manage-company-name')
 const { breadcrumbs, dashboardUrl } = useFilingNavigation(t('page.correction.h1'))
 const modal = useFilingModals()
 const { handleButtonLoading, setAlertText: setBtnCtrlAlert } = useConnectButtonControl()
-const { getFilingName } = useFiling()
 
 const businessId = route.params.businessId as string
 const filingId = route.params.filingId as string // the pre-created correction draft filing ID
 const FILING_TYPE = FilingType.CORRECTION
+
+const { hasAnyChanges, triggerActiveSubFormAlerts } = useCorrectionHelper()
 
 const {
   canSubmit,
@@ -31,24 +24,17 @@ const {
     [() => store.initialDirectors, () => store.directors],
     [() => store.initialReceivers, () => store.receivers],
     [() => store.initialLiquidators, () => store.liquidators],
+    [() => store.initialCustodians, () => store.custodians],
     [() => store.initialOffices, () => store.offices],
     [() => store.initialShareClasses, () => store.shareClasses],
     [() => store.initialNameTranslations, () => store.nameTranslations],
-    [() => store.companyName.old.legalName, () => store.companyName.new.legalName]
+    [() => store.initialResolutionDates, () => store.resolutionDates],
+    [() => store.initialCourtOrders, () => store.courtOrders],
+    [() => store.initialAmalgamation, () => store.amalgamation],
+    [() => store.initialAmalStmnt, () => store.amalStmnt]
   ],
   // At least one correctable section must have changes to allow submission
-  () => {
-    const hasValidComment = !!store.formState.comment?.detail?.trim()
-
-    return store.directors.some(d => d.new.actions.length > 0)
-      || store.receivers.some(r => r.new.actions.length > 0)
-      || store.liquidators.some(l => l.new.actions.length > 0)
-      || store.offices.some(o => o.new.actions?.length > 0)
-      || store.shareClasses.some(sc => sc.new.actions.length > 0)
-      || store.nameTranslations.some(nt => nt.new.actions.length > 0)
-      || (store.hasCommentChanges && hasValidComment)
-      || store.companyName.new.actions.length > 0
-  }
+  () => hasAnyChanges.value
 )
 
 definePageMeta({
@@ -68,32 +54,9 @@ const originalFilingName = computed(() => {
   return getFilingName(store.correctedFilingType) ?? store.correctedFilingType
 })
 
-/** Formatted date of the original filing (e.g. "February 8, 2021") */
-const originalFilingDate = computed(() => {
-  if (!store.correctedFilingDate) {
-    return ''
-  }
-  return toReadableDate(store.correctedFilingDate)
-})
-
-function checkActiveSubForm() {
-  if (!store.hasActiveSubForm) {
-    return false
-  }
-  const alertMsg = t('text.finishTaskBeforeOtherChanges')
-  return (store.formState.activeOffice && setOfficesAlert('office-address-form', alertMsg))
-    || (store.formState.activeDirector && setPartiesAlert('party-details-form', alertMsg))
-    || (store.formState.activeReceiver && setReceiversAlert('party-details-form', alertMsg))
-    || (store.formState.activeLiquidator && setLiquidatorsAlert('party-details-form', alertMsg))
-    || (store.formState.activeClass && setSharesAlert('share-class-form', alertMsg))
-    || (store.formState.activeSeries && setSharesAlert('share-series-form', alertMsg))
-    || (store.formState.activeNameTranslation && setNameTranslationsAlert('name-translation-form', alertMsg))
-    || (store.formState.activeNameRequest && setCompanyNameAlert('company-name-form', alertMsg))
-}
-
 function reviewAndConfirm() {
   setBtnCtrlAlert(undefined)
-  if (checkActiveSubForm()) {
+  if (triggerActiveSubFormAlerts()) {
     return
   }
   if (!canSubmit()) {
@@ -105,16 +68,17 @@ function reviewAndConfirm() {
 async function submitFiling() {
   try {
     setBtnCtrlAlert(undefined)
-    if (checkActiveSubForm()) {
+    if (triggerActiveSubFormAlerts()) {
       return
     }
     if (!canSubmit()) {
-      return setBtnCtrlAlert(t('text.noChangesToSubmit'), 'right')
+      return setBtnCtrlAlert(t('text.noChangesToSubmit'), 'right', 1)
     }
     handleButtonLoading(true, 'right', 1)
     await store.submit(true)
     revokeBeforeUnload()
     await navigateTo(dashboardUrl.value, { external: true })
+    handleButtonLoading(false)
   } catch (error) {
     modal.openSaveFilingErrorModal(error)
     handleButtonLoading(false)
@@ -126,11 +90,11 @@ async function saveFiling(resumeLater = false, enableUnsavedChangesBlock = true)
   try {
     if (enableUnsavedChangesBlock) {
       setBtnCtrlAlert(undefined)
-      if (checkActiveSubForm()) {
+      if (triggerActiveSubFormAlerts()) {
         return
       }
       if (!canSave()) {
-        return setBtnCtrlAlert(t('text.noChangesToSave'), 'left')
+        return setBtnCtrlAlert(t('text.noChangesToSave'), 'right', 1)
       }
     }
     await store.submit(false)
@@ -186,21 +150,22 @@ const { currentStep, nextStep } = useFilingPageWatcher({
 
 <template>
   <div class="py-6 space-y-6 sm:py-10 sm:space-y-10">
-    <ConnectSpinner v-if="initializing" fullscreen />
+    <ConnectSpinner v-if="store.initializing" fullscreen />
     <div class="space-y-2">
       <h1 id="filing-h1">
         {{ $t('page.correction.h1') }}
       </h1>
-      <p v-if="originalFilingDate">
-        <strong>{{ $t('label.originalFilingDate') }}:</strong> {{ originalFilingDate }}
+      <p v-if="store.correctedFilingDateDisplay">
+        <strong>{{ $t('label.originalFilingDate') }}:</strong> {{ store.correctedFilingDateDisplay }}
       </p>
       <ConnectI18nHelper
         as="p"
         translation-path="page.correction.desc"
         :filing-type="originalFilingName"
-        :filing-date="originalFilingDate"
+        :filing-date="store.correctedFilingDateDisplay"
       />
     </div>
+    <AlertDraftRebase />
     <FormCorrectionStep1
       v-if="currentStep === 1"
       id="correction-filing-step-1"

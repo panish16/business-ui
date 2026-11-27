@@ -2,19 +2,29 @@ import type { ManageBaseProps } from '#business/app/interfaces'
 
 interface PartyFormProps {
   hideRemove?: boolean
+  /** passed through to the party sub form's FormAddress */
+  addressFormProps?: AddressFormProps
   partyNameProps?: {
     allowBusinessName?: boolean
     allowPreferredName?: boolean
+    requireNameChangeConfirmation?: boolean
+    requireFirstName?: boolean
   }
   partyRoleProps?: {
     allowedRoles: RoleTypeUi[]
     roleClass?: RoleClass
   }
+  // limits on the party's effective (start) and cessation (end) dates, e.g. a director can't be
+  // appointed before founding - the cessation date is always also bounded by the effective date
+  effectiveDateBounds?: DateBounds
+  cessationDateBounds?: DateBounds
 }
 
 export type ManagePartiesProps = ManageBaseProps & {
   columnsToDisplay?: TablePartyColumnName[]
   labelOverrides?: TableLabelOverrides
+  // former name shows for NAME_CHANGED parties in every party table; pass false to opt out
+  showFormerName?: boolean
 } & (
   | {
     variant?: 'default' | 'correct'
@@ -23,13 +33,17 @@ export type ManagePartiesProps = ManageBaseProps & {
     roleType?: RoleTypeUi
     partyFormProps?: PartyFormProps
     allowedActions?: ManageAllowedAction[]
+    preventActions?: boolean
+    actionPreventedSignal?: number
   }
   | {
     variant: 'readonly' | 'correct-readonly'
     subject?: never
     modelName?: never
-    roleType?: never
+    roleType?: RoleTypeUi
     partyFormProps?: never
     allowedActions?: never
+    preventActions?: never
+    actionPreventedSignal?: never
   }
 )

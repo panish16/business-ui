@@ -1,5 +1,13 @@
 import type { BadgeProps } from '@nuxt/ui'
 
+/**
+ * The DELETED "stamp" badge style - shared by the tables and the court order file list.
+ *
+ * Requirement: the DELETED badge is NOT greyed out with its deleted row - it keeps its own light grey
+ * background and dark text, so only apply DELETED_CLASS to the label, never to a cell that contains the badge
+ */
+export const DELETED_BADGE_CLASS = 'bg-shade-secondary text-neutral-highlighted'
+
 export function getTableBadges<T extends { actions: ActionType[] }>(
   row: TableBusinessRow<T>,
   badgeLabelOverrides?: Partial<Record<ActionType, string>>
@@ -8,7 +16,7 @@ export function getTableBadges<T extends { actions: ActionType[] }>(
 
   const badgeMap: Record<ActionType, BadgeProps> = {
     [ActionType.ADDED]: { label: t('badge.added') },
-    [ActionType.REMOVED]: { label: t('badge.deleted'), class: 'bg-shade-secondary text-neutral-highlighted' },
+    [ActionType.REMOVED]: { label: t('badge.deleted'), class: DELETED_BADGE_CLASS },
     [ActionType.ADDRESS_CHANGED]: {
       label: badgeLabelOverrides?.[ActionType.ADDRESS_CHANGED] ?? t('badge.addressChanged')
     },
@@ -22,6 +30,12 @@ export function getTableBadges<T extends { actions: ActionType[] }>(
   // get unique actions
   const rowActions = Array.from(new Set(row.original.new.actions))
 
+  // a resumed draft row whose value a staff filing set (useDraftRebase): the user's own action replaces the badge
+  // until they undo it (the tag stays on the row)
+  if (!rowActions.length) {
+    return row.original.modifiedByStaff ? [{ label: t('badge.modifiedByStaff') }] : []
+  }
+
   if (rowActions.includes(ActionType.ADDED)) {
     return [badgeMap.ADDED]
   }
@@ -30,5 +44,7 @@ export function getTableBadges<T extends { actions: ActionType[] }>(
     return [badgeMap.REMOVED]
   }
 
-  return rowActions.map(action => badgeMap[action]).filter(Boolean)
+  const badges = rowActions.map(action => badgeMap[action]).filter(Boolean)
+  // several actions can share a label (e.g. every change is CORRECTED in a correction) - only show each label once
+  return badges.filter((badge, i) => badges.findIndex(b => b.label === badge.label) === i)
 }

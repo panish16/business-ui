@@ -14,7 +14,7 @@ mockNuxtImport('useConnectAccountStore', () => () => ({ currentAccount: { id: 12
 
 describe('useBusinessParty', () => {
   beforeEach(async () => {
-    vi.resetAllMocks()
+    vi.clearAllMocks()
   })
 
   describe('initFiling', () => {
@@ -22,7 +22,7 @@ describe('useBusinessParty', () => {
     const partiesMock = getPartiesMock()
 
     beforeEach(async () => {
-      vi.resetAllMocks()
+      vi.clearAllMocks()
       const pinia = createPinia()
       setActivePinia(pinia)
       store = useBusinessStore()
@@ -51,6 +51,24 @@ describe('useBusinessParty', () => {
           .toBe(partiesMock.parties[0]!.mailingAddress?.streetAddress)
         expect(resp![0]!.old!.address.mailingAddress.street)
           .toBe(partiesMock.parties[0]!.mailingAddress?.streetAddress)
+      })
+
+      test('should build the party query from the provided params', async () => {
+        await useBusinessParty().getBusinessParties(
+          identifier, RoleClass.DIRECTOR, RoleType.DIRECTOR, true, '2026-01-01')
+
+        expect(mockGetParties).toHaveBeenCalledWith(identifier, {
+          classType: RoleClass.DIRECTOR,
+          role: RoleType.DIRECTOR,
+          all: true,
+          date: '2026-01-01'
+        }, false)
+      })
+
+      test('should omit the date key when no date is provided', async () => {
+        await useBusinessParty().getBusinessParties(identifier, undefined, RoleType.DIRECTOR)
+
+        expect(mockGetParties).toHaveBeenCalledWith(identifier, { role: RoleType.DIRECTOR }, false)
       })
     })
   })

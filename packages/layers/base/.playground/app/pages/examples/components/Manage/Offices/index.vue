@@ -1,0 +1,50 @@
+<script setup lang="ts">
+import mockOffices from '#test-mocks/business-addresses/json/default.json'
+
+definePageMeta({
+  layout: 'connect-auth',
+  breadcrumbs: [{ label: 'Examples', to: '/' }, { label: 'Manage Offices' }]
+})
+
+const { tableState } = useManageOffices()
+
+tableState.value = Object.entries(mockOffices).map(([key, value]) => {
+  const id = crypto.randomUUID()
+  return {
+    new: {
+      id,
+      type: key as OfficeType,
+      actions: [],
+      address: { ...formatBaseAddressUi(value) },
+      isEditing: false
+    },
+    old: {
+      id,
+      type: key as OfficeType,
+      actions: [],
+      address: { ...formatBaseAddressUi(value) },
+      isEditing: false
+    }
+  }
+})
+
+const activeOffice = ref<ActiveOfficesSchema | undefined>(undefined)
+const loading = ref(false)
+</script>
+
+<template>
+  <UContainer>
+    <ConnectPageSection
+      :heading="{ label: 'Manage Offices - Default' }"
+      ui-body="p-10"
+    >
+      <ManageOffices
+        v-model:active-subject="activeOffice"
+        :loading="loading"
+        :empty-text="loading ? `Loading...` : 'No offices'"
+        subject="Office"
+        table-title="Offices"
+      />
+    </ConnectPageSection>
+  </UContainer>
+</template>

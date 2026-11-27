@@ -1,8 +1,41 @@
 <script setup lang="ts">
+const { t } = useI18n()
 const store = useCorrectionStore()
-const { hasActiveSubForm } = storeToRefs(store)
+const { hasActiveSubForm } = useCorrectionHelper()
 const { business, businessContact } = storeToRefs(useBusinessStore())
 const partyColumns: TablePartyColumnName[] = ['name', 'mailing', 'delivery', 'effectiveDates', 'actions']
+const custodianColumns: TablePartyColumnName[] = ['name', 'mailing', 'delivery', 'email', 'actions']
+// a custodian can only be corrected - adding or removing (ceasing) one is not part of a custodian correction
+const custodianAllowedActions = [
+  ManageAllowedAction.NAME_CHANGE,
+  ManageAllowedAction.ADDRESS_CHANGE,
+  ManageAllowedAction.EMAIL_CHANGE
+]
+
+// a director can't be appointed before the business existed, or ceased in the future - founding date
+// is a UTC datetime, so convert to the Pacific calendar date shown to users before using it as a bound
+const directorFormProps = computed(() => {
+  const foundingDate = business.value?.foundingDate ? toDate(business.value.foundingDate) : undefined
+  return {
+    effectiveDateBounds: {
+      min: {
+        date: foundingDate ? toDateStr(foundingDate) : undefined,
+        message: t('validation.appointmentDateBeforeFounding')
+      }
+    },
+    cessationDateBounds: {
+      max: {
+        date: getToday(),
+        message: t('validation.cessationDateInFuture')
+      }
+    }
+  }
+})
+
+const yourCompanyFieldOverrides = computed(() => getYourCompanyFieldOverrides(
+  store.correctedFilingType,
+  store.correctedFilingSubType as FilingSubType
+))
 
 // transient signal for child-initiated prevented actions
 const actionPreventedSignal = ref(0)
@@ -19,28 +52,33 @@ function onActionPrevented() {
     class="space-y-6 sm:space-y-10"
     @error="onFormSubmitError"
   >
-    <ManageCompanyName
-      v-model:active-name-request="store.formState.activeNameRequest"
-      v-model:active-name-translation="store.formState.activeNameTranslation"
+    <!-- sections are shown based on the fields correctable for the corrected filing (see getCorrectableSections) -->
+    <ManageYourCompany
+      v-if="store.isCorrectable(CorrectionSection.YOUR_COMPANY)"
+      v-model:active-subject="store.formState.activeYourCompany"
+      v-model:active-nt="store.formState.activeNameTranslation"
       :loading="store.initializing"
       :business
+      :filing-type="FilingType.CORRECTION"
       :contact="businessContact"
-      :correct-name-options="getCorrectNameOptionsForCorpType(business?.legalType)"
-      :nr-allowed-actions-types="FILING_NR_ALLOWED_ACTIONS[FilingType.CORRECTION]"
       :prevent-actions="hasActiveSubForm"
+      :field-overrides="yourCompanyFieldOverrides"
       variant="correct"
       :action-prevented-signal="actionPreventedSignal"
       @action-prevented="onActionPrevented"
     />
 
     <ManageOffices
-      v-model:active-office="store.formState.activeOffice"
+      v-if="store.isCorrectable(CorrectionSection.OFFICES)"
+      v-model:active-subject="store.formState.activeOffice"
       data-testid="office-addresses-section"
+      model-name="activeOffice"
       :loading="store.initializing"
       :empty-text="$t('label.noOffices')"
       :table-title="$t('label.officeAddresses')"
       subject=""
       variant="correct"
+      :address-form-props="{ bcCanadaOnly: 'delivery', noPoBox: true }"
       :allowed-actions="[ManageAllowedAction.ADDRESS_CHANGE]"
       :prevent-actions="hasActiveSubForm"
       :action-prevented-signal="actionPreventedSignal"
@@ -48,33 +86,37 @@ function onActionPrevented() {
     />
 
     <ManageParties
-      v-model:active-party="store.formState.activeDirector"
+      v-if="store.isCorrectable(CorrectionSection.DIRECTORS)"
+      v-model:active-subject="store.formState.activeParty"
+      state-key="manage-directors"
+      model-name="activeParty"
       :loading="store.initializing"
       :empty-text="$t('label.noDirectors')"
-      :table-title="$t('label.currentDirectors')"
+      :table-title="$t('label.directors')"
       :subject="$t('label.director')"
       :columns-to-display="partyColumns"
       data-testid="current-directors-section"
       :role-type="RoleTypeUi.DIRECTOR"
-      model-name="activeDirector"
       :prevent-actions="hasActiveSubForm"
       variant="correct"
+      :party-form-props="directorFormProps"
       :action-prevented-signal="actionPreventedSignal"
       @action-prevented="onActionPrevented"
     />
 
     <!-- FUTURE: conditionally show receivers? -->
     <ManageParties
-      v-model:active-party="store.formState.activeReceiver"
+      v-if="store.isCorrectable(CorrectionSection.RECEIVERS)"
+      v-model:active-subject="store.formState.activeParty"
       state-key="manage-receivers"
+      model-name="activeParty"
       :loading="store.initializing"
       :empty-text="$t('label.noReceivers')"
-      :table-title="$t('label.currentReceivers')"
+      :table-title="$t('label.receivers')"
       :subject="$t('label.receiver')"
       :columns-to-display="partyColumns"
       data-testid="receivers-section"
       :role-type="RoleTypeUi.RECEIVER"
-      model-name="activeReceiver"
       :prevent-actions="hasActiveSubForm"
       variant="correct"
       :party-form-props="{
@@ -86,16 +128,17 @@ function onActionPrevented() {
 
     <!-- FUTURE: conditionally show liquidators? -->
     <ManageParties
-      v-model:active-party="store.formState.activeLiquidator"
+      v-if="store.isCorrectable(CorrectionSection.LIQUIDATORS)"
+      v-model:active-subject="store.formState.activeParty"
       state-key="manage-liquidators"
+      model-name="activeParty"
       :loading="store.initializing"
       :empty-text="$t('label.noLiquidators')"
-      :table-title="$t('label.currentLiquidators')"
+      :table-title="$t('label.liquidators')"
       :subject="$t('label.liquidator')"
       :columns-to-display="partyColumns"
       data-testid="liquidators-section"
       :role-type="RoleTypeUi.LIQUIDATOR"
-      model-name="activeLiquidator"
       :prevent-actions="hasActiveSubForm"
       variant="correct"
       :party-form-props="{
@@ -105,14 +148,69 @@ function onActionPrevented() {
       @action-prevented="onActionPrevented"
     />
 
+    <ManageParties
+      v-if="store.isCorrectable(CorrectionSection.CUSTODIANS)"
+      v-model:active-subject="store.formState.activeParty"
+      state-key="manage-custodians"
+      model-name="activeParty"
+      :loading="store.initializing"
+      :empty-text="$t('label.noCustodians')"
+      :table-title="$t('label.custodians')"
+      :subject="$t('label.custodian')"
+      :columns-to-display="custodianColumns"
+      data-testid="custodians-section"
+      :role-type="RoleTypeUi.CUSTODIAN"
+      :prevent-actions="hasActiveSubForm"
+      variant="correct"
+      :allowed-actions="custodianAllowedActions"
+      :party-form-props="{
+        partyNameProps: { allowBusinessName: false, allowPreferredName: false },
+        addressFormProps: { bcCanadaOnly: 'delivery', noPoBox: true },
+        hideRemove: true
+      }"
+      :action-prevented-signal="actionPreventedSignal"
+      @action-prevented="onActionPrevented"
+    />
+
     <ManageShareStructure
-      v-model:active-class="store.formState.activeClass"
-      v-model:active-series="store.formState.activeSeries"
+      v-if="store.isCorrectable(CorrectionSection.SHARE_STRUCTURE)"
+      v-model:active-subject="store.formState.activeShareStructure"
+      v-model:rd="store.formState.resolutionDate"
       data-testid="share-structure-section"
       :loading="store.initializing"
       :empty-text="$t('label.noSubjectAddedYet', { subject: $t('label.shareClasses') })"
       :prevent-actions="hasActiveSubForm"
       variant="correct"
+      model-name="activeShareStructure.value"
+      :action-prevented-signal="actionPreventedSignal"
+      @action-prevented="onActionPrevented"
+    />
+
+    <ManageCourtOrders
+      v-if="store.isCorrectable(CorrectionSection.COURT_ORDERS)"
+      v-model:active-subject="store.formState.activeCourtOrder"
+      data-testid="court-orders-section"
+      variant="correct"
+      model-name="activeCourtOrder"
+      :loading="store.initializing"
+      :add-default-values="{ filingId: store.correctedFilingId, filingType: store.correctedFilingType }"
+      :empty-text="$t('label.noSubjectAddedYet', { subject: $t('label.courtOrders') })"
+      :prevent-actions="hasActiveSubForm"
+      :action-prevented-signal="actionPreventedSignal"
+      :identifier="business?.identifier"
+      :entity-type="business?.legalType!"
+      @action-prevented="onActionPrevented"
+    />
+
+    <ManageAmalgamation
+      v-if="store.isCorrectable(CorrectionSection.AMALGAMATION)"
+      v-model:active-subject="store.formState.activeAmal"
+      data-testid="amalgamation-section"
+      variant="correct"
+      model-name="activeAmal.value"
+      :loading="store.initializing"
+      :empty-text="$t('label.noSubjectAddedYet', { subject: $t('label.amalgamations') })"
+      :prevent-actions="hasActiveSubForm"
       :action-prevented-signal="actionPreventedSignal"
       @action-prevented="onActionPrevented"
     />

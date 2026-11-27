@@ -19,29 +19,33 @@ export const useBusinessQuery = () => {
 
   function addressesOptions(
     businessId: MaybeRefOrGetter<string>,
+    query?: BusinessAddressesQuery,
     options?: DefineOptions<ApiEntityOfficeAddress>
   ) {
     return defineQueryOptions({
-      query: () => $businessApi<ApiEntityOfficeAddress>(`businesses/${toValue(businessId)}/addresses`),
+      query: () => $businessApi<ApiEntityOfficeAddress>(`businesses/${toValue(businessId)}/addresses`, {
+        query
+      }),
       staleTime: DEFAULT_STALE_TIME,
       ...options,
-      key: keys.addresses(toValue(businessId))
+      key: keys.addresses(toValue(businessId), query)
     })
   }
 
   function addresses(
     businessId: MaybeRefOrGetter<string>,
+    query?: BusinessAddressesQuery,
     options?: QueryOptions<ApiEntityOfficeAddress>
   ) {
-    return useQuery(() => addressesOptions(businessId, options as DefineOptions<ApiEntityOfficeAddress>))
+    return useQuery(() => addressesOptions(businessId, query, options as DefineOptions<ApiEntityOfficeAddress>))
   }
 
   function aliasesOptions(
     businessId: MaybeRefOrGetter<string>,
-    options?: DefineOptions<{ aliases: Alias[] }>
+    options?: DefineOptions<{ aliases: NameTranslation[] }>
   ) {
     return defineQueryOptions({
-      query: () => $businessApi<{ aliases: Alias[] }>(`businesses/${toValue(businessId)}/aliases`),
+      query: () => $businessApi<{ aliases: NameTranslation[] }>(`businesses/${toValue(businessId)}/aliases`),
       staleTime: DEFAULT_STALE_TIME,
       ...options,
       key: keys.aliases(toValue(businessId))
@@ -50,9 +54,9 @@ export const useBusinessQuery = () => {
 
   function aliases(
     businessId: MaybeRefOrGetter<string>,
-    options?: QueryOptions<{ aliases: Alias[] }>
+    options?: QueryOptions<{ aliases: NameTranslation[] }>
   ) {
-    return useQuery(() => aliasesOptions(businessId, options as DefineOptions<{ aliases: Alias[] }>))
+    return useQuery(() => aliasesOptions(businessId, options as DefineOptions<{ aliases: NameTranslation[] }>))
   }
 
   function authorizedActionsOptions(
@@ -104,6 +108,57 @@ export const useBusinessQuery = () => {
     ))
   }
 
+  function businessExtOptions(
+    businessId: MaybeRefOrGetter<string>,
+    forCorrection: boolean = false,
+    filingType?: FilingType,
+    options?: DefineOptions<{ amalgamation: Amalgamation }>
+  ) {
+    const addedPath = filingType ? `/${filingType}` : ''
+    return defineQueryOptions({
+      query: () => $businessApi(`businesses/${toValue(businessId)}/extended${addedPath}`, {
+        query: forCorrection ? { forCorrection: true } : undefined
+      }),
+      staleTime: DEFAULT_STALE_TIME,
+      ...options,
+      key: keys.businessExt(toValue(businessId), forCorrection, filingType)
+    })
+  }
+
+  function businessExt(
+    businessId: MaybeRefOrGetter<string>,
+    forCorrection: boolean = false,
+    filingType?: FilingType,
+    options?: QueryOptions<{ amalgamation: Amalgamation }>
+  ) {
+    return useQuery(() => businessExtOptions(
+      businessId, forCorrection, filingType, options as DefineOptions<{ amalgamation: Amalgamation }>
+    ))
+  }
+
+  function courtOrdersOptions(
+    businessId: MaybeRefOrGetter<string>,
+    options?: DefineOptions<{ courtOrders: CourtOrderResponse[] }>
+  ) {
+    return defineQueryOptions({
+      query: () => $businessApi<{ courtOrders: CourtOrderResponse[] }>(
+        `businesses/${toValue(businessId)}/court-orders`
+      ),
+      staleTime: DEFAULT_STALE_TIME,
+      ...options,
+      key: keys.courtOrders(toValue(businessId))
+    })
+  }
+
+  function courtOrders(
+    businessId: MaybeRefOrGetter<string>,
+    options?: QueryOptions<{ courtOrders: CourtOrderResponse[] }>
+  ) {
+    return useQuery(() => courtOrdersOptions(
+      businessId, options as DefineOptions<{ courtOrders: CourtOrderResponse[] }>
+    ))
+  }
+
   function documentOptions(
     url: string,
     options?: DefineOptions<Blob>
@@ -150,24 +205,55 @@ export const useBusinessQuery = () => {
   function filingOptions<F extends FilingRecord>(
     businessId: MaybeRefOrGetter<string>,
     filingId: MaybeRefOrGetter<string | number>,
-    options?: DefineOptions<FilingGetByIdResponse<F>>
+    publicData = false,
+    options?: DefineOptions<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse>
   ) {
     return defineQueryOptions({
-      query: () => $businessApi<FilingGetByIdResponse<F>>(
-        `businesses/${toValue(businessId)}/filings/${toValue(filingId)}`
+      query: () => $businessApi<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse>(
+        `businesses/${toValue(businessId)}/filings/${toValue(filingId)}`,
+        { query: publicData ? { public: true } : undefined }
       ),
       staleTime: DEFAULT_STALE_TIME,
       ...options,
-      key: keys.filing(toValue(businessId), toValue(filingId))
+      key: keys.filing(toValue(businessId), toValue(filingId), publicData)
     })
   }
 
   function filing<F extends FilingRecord>(
     businessId: MaybeRefOrGetter<string>,
     filingId: MaybeRefOrGetter<string | number>,
-    options?: QueryOptions<FilingGetByIdResponse<F>>
+    publicData = false,
+    options?: QueryOptions<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse>
   ) {
-    return useQuery(() => filingOptions(businessId, filingId, options as DefineOptions<FilingGetByIdResponse<F>>))
+    return useQuery(() => filingOptions(
+      businessId,
+      filingId,
+      publicData,
+      options as DefineOptions<FilingGetByIdResponse<F> | FilingGetByIdPublicResponse>
+    ))
+  }
+
+  function filingChangesOptions(
+    businessId: MaybeRefOrGetter<string>,
+    filingId: MaybeRefOrGetter<string | number>,
+    options?: DefineOptions<DraftChangesReport>
+  ) {
+    return defineQueryOptions({
+      query: () => $businessApi<DraftChangesReport>(
+        `businesses/${toValue(businessId)}/filings/${toValue(filingId)}/changes`
+      ),
+      staleTime: 0, // the report must reflect the business as it is now
+      ...options,
+      key: keys.filingChanges(toValue(businessId), toValue(filingId))
+    })
+  }
+
+  function filingChanges(
+    businessId: MaybeRefOrGetter<string>,
+    filingId: MaybeRefOrGetter<string | number>,
+    options?: QueryOptions<DraftChangesReport>
+  ) {
+    return useQuery(() => filingChangesOptions(businessId, filingId, options as DefineOptions<DraftChangesReport>))
   }
 
   function filingCommentsOptions(
@@ -216,6 +302,34 @@ export const useBusinessQuery = () => {
     )
   }
 
+  function filingValidateSectionOptions(
+    businessId: MaybeRefOrGetter<string>,
+    payload: FilingValidateSectionRequest,
+    options?: DefineOptions<FilingValidateSectionResponse>
+  ) {
+    return defineQueryOptions({
+      query: () => $businessApi<FilingValidateSectionResponse>(
+        `businesses/${toValue(businessId)}/filings/validate-section`, {
+          method: 'POST',
+          body: payload
+        }
+      ),
+      staleTime: DEFAULT_STALE_TIME,
+      ...options,
+      key: keys.filingValidateSection(toValue(businessId), payload)
+    })
+  }
+
+  function filingValidateSection(
+    businessId: MaybeRefOrGetter<string>,
+    payload: FilingValidateSectionRequest,
+    options?: QueryOptions<FilingValidateSectionResponse>
+  ) {
+    return useQuery(() => filingValidateSectionOptions(
+      businessId, payload, options as DefineOptions<FilingValidateSectionResponse>)
+    )
+  }
+
   function ledgerOptions(
     businessId: MaybeRefOrGetter<string>,
     effectiveDate?: IsoDatePacific,
@@ -261,7 +375,7 @@ export const useBusinessQuery = () => {
 
   function partiesOptions(
     businessId: MaybeRefOrGetter<string>,
-    query?: Record<string, unknown>,
+    query?: BusinessPartiesQuery,
     options?: DefineOptions<{ parties: OrgPerson[] }>
   ) {
     return defineQueryOptions({
@@ -276,10 +390,37 @@ export const useBusinessQuery = () => {
 
   function parties(
     businessId: MaybeRefOrGetter<string>,
-    query?: Record<string, unknown>,
+    query?: BusinessPartiesQuery,
     options?: QueryOptions<{ parties: OrgPerson[] }>
   ) {
     return useQuery(() => partiesOptions(businessId, query, options as DefineOptions<{ parties: OrgPerson[] }>))
+  }
+
+  function resolutionsOptions(
+    businessId: MaybeRefOrGetter<string>,
+    isSpecial = false,
+    options?: DefineOptions<{ resolutions: Resolution[] }>
+  ) {
+    return defineQueryOptions({
+      query: () => $businessApi<{ resolutions: Resolution[] }>(`businesses/${toValue(businessId)}/resolutions`, {
+        query: isSpecial ? { type: 'SPECIAL' } : undefined
+      }),
+      staleTime: DEFAULT_STALE_TIME,
+      ...options,
+      key: keys.resolutions(toValue(businessId), isSpecial)
+    })
+  }
+
+  function resolutions(
+    businessId: MaybeRefOrGetter<string>,
+    isSpecial = false,
+    options?: QueryOptions<{ resolutions: Resolution[] }>
+  ) {
+    return useQuery(() => resolutionsOptions(
+      businessId,
+      isSpecial,
+      options as DefineOptions<{ resolutions: Resolution[] }>)
+    )
   }
 
   function shareClassOptions(
@@ -354,24 +495,34 @@ export const useBusinessQuery = () => {
     authorizedActionsOptions,
     business,
     businessOptions,
+    businessExt,
+    businessExtOptions,
     bootstrapFiling,
     bootstrapFilingOptions,
+    courtOrders,
+    courtOrdersOptions,
     document,
     documentOptions,
     filing,
     filingOptions,
+    filingChanges,
+    filingChangesOptions,
     filingComments,
     filingCommentsOptions,
     filingDocumentUrls,
     filingDocumentUrlsOptions,
+    filingValidateSection,
+    filingValidateSectionOptions,
     ledger,
     ledgerOptions,
     linkedNameRequest,
     linkedNameRequestOptions,
     parties,
     partiesOptions,
-    shareClassOptions,
+    resolutions,
+    resolutionsOptions,
     shareClasses,
+    shareClassOptions,
     tasks,
     tasksOptions,
     // auth api queries

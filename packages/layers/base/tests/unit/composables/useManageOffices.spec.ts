@@ -10,36 +10,64 @@ describe('useManageOffices', () => {
   }) as any
 
   const mockOffice = {
+    id: '123',
     type: OfficeType.REGISTERED,
     actions: [],
     address: {
       deliveryAddress: { street: '123 Main St', city: 'Victoria', country: 'CA', region: 'BC', postalCode: 'V1X 1X1' },
       mailingAddress: { street: '123 Main St', city: 'Victoria', country: 'CA', region: 'BC', postalCode: 'V1X 1X1' },
       sameAs: true
-    }
+    },
+    isEditing: false
   }
 
   beforeEach(() => {
-    const { tableState, addingOffice, expandedState } = useManageOffices(stateKey)
+    const { tableState } = useManageOffices(stateKey)
     tableState.value = []
-    addingOffice.value = false
-    expandedState.value = undefined
   })
 
   describe('Initial State', () => {
     it('should initialize with default values', () => {
-      const { tableState, addingOffice, expandedState } = useManageOffices(stateKey)
+      const { tableState } = useManageOffices(stateKey)
       expect(tableState.value).toEqual([])
-      expect(addingOffice.value).toBe(false)
-      expect(expandedState.value).toBeUndefined()
     })
   })
 
-  describe('addNewOffice', () => {
-    it('should add a new office to the table with ADDED action', () => {
-      const { addNewOffice, tableState } = useManageOffices(stateKey)
+  describe('hasChanges', () => {
+    it('should return false when tableState has no items or no actions', () => {
+      const { tableState, hasChanges } = useManageOffices(stateKey)
 
-      addNewOffice(mockOffice as any)
+      tableState.value = []
+      expect(hasChanges.value).toBe(false)
+
+      tableState.value = [
+        {
+          old: { id: '1', actions: [] },
+          new: { id: '1', actions: [] }
+        }
+      ] as any
+      expect(hasChanges.value).toBe(false)
+    })
+
+    it('should return true when any item has populated actions', () => {
+      const { tableState, hasChanges } = useManageOffices(stateKey)
+
+      tableState.value = [
+        {
+          old: { id: '1', actions: [] },
+          new: { id: '1', actions: [ActionType.CHANGED] }
+        }
+      ] as any
+
+      expect(hasChanges.value).toBe(true)
+    })
+  })
+
+  describe('addSubject', () => {
+    it('should add a new office to the table with ADDED action', () => {
+      const { addSubject, tableState } = useManageOffices(stateKey)
+
+      addSubject(mockOffice as any)
 
       expect(tableState.value).toHaveLength(1)
       expect(tableState.value[0]!.new.actions).toContain(ActionType.ADDED)
@@ -47,8 +75,8 @@ describe('useManageOffices', () => {
     })
 
     it('should ignore undefined office', () => {
-      const { addNewOffice, tableState } = useManageOffices(stateKey)
-      addNewOffice(undefined as any)
+      const { addSubject, tableState } = useManageOffices(stateKey)
+      addSubject(undefined as any)
       expect(tableState.value).toHaveLength(0)
     })
   })
@@ -62,9 +90,8 @@ describe('useManageOffices', () => {
       ]
 
       const updatedRow = { new: { type: 'updated-office' } as any, old: undefined }
-      const rowToUpdate = mockRow(0, tableState.value[0])
 
-      updateTable(updatedRow, rowToUpdate)
+      updateTable(updatedRow)
 
       expect(tableState.value[0]!.new.type).toBe('updated-office')
       expect(tableState.value[1]!.new.type).toBe('office2')
@@ -84,32 +111,32 @@ describe('useManageOffices', () => {
     })
   })
 
-  describe('removeOffice', () => {
+  describe('removeSubject', () => {
     it('should fully remove a row if it was a newly added office', () => {
-      const { tableState, removeOffice } = useManageOffices(stateKey)
+      const { tableState, removeSubject } = useManageOffices(stateKey)
       const newOffice = { new: mockOffice, old: undefined }
       tableState.value = [newOffice]
 
-      removeOffice(mockRow(0, newOffice))
+      removeSubject(mockRow(0, newOffice))
 
       expect(tableState.value).toHaveLength(0)
     })
 
     it('should add REMOVED action for existing office', () => {
-      const { tableState, removeOffice } = useManageOffices(stateKey)
+      const { tableState, removeSubject } = useManageOffices(stateKey)
       const existingOffice = { new: mockOffice, old: mockOffice }
       tableState.value = [existingOffice]
 
-      removeOffice(mockRow(0, existingOffice))
+      removeSubject(mockRow(0, existingOffice))
 
       expect(tableState.value).toHaveLength(1)
       expect(tableState.value[0]!.new.actions).toContain(ActionType.REMOVED)
     })
   })
 
-  describe('undoOffice', () => {
+  describe('undoSubject', () => {
     it('should revert "new" state to "old" state', () => {
-      const { tableState, undoOffice } = useManageOffices(stateKey)
+      const { tableState, undoSubject } = useManageOffices(stateKey)
       const oldVersion = { ...mockOffice, type: OfficeType.RECORDS }
       const currentVersion = {
         new: { ...mockOffice, actions: [ActionType.REMOVED] },
@@ -117,58 +144,20 @@ describe('useManageOffices', () => {
       }
       tableState.value = [currentVersion]
 
-      undoOffice(mockRow(0, currentVersion))
+      undoSubject(mockRow(0, currentVersion))
 
       expect(tableState.value[0]!.new).toEqual(oldVersion)
       expect(tableState.value[0]!.new.actions).toEqual(oldVersion.actions || [])
     })
 
     it('should do nothing if old state is undefined', () => {
-      const { tableState, undoOffice } = useManageOffices(stateKey)
+      const { tableState, undoSubject } = useManageOffices(stateKey)
       const currentState = { new: mockOffice, old: undefined }
       tableState.value = [currentState]
 
-      undoOffice(mockRow(0, currentState))
+      undoSubject(mockRow(0, currentState))
 
       expect(tableState.value[0]).toEqual(currentState)
-    })
-  })
-
-  describe('applyTableEdits', () => {
-    it('should keep the ADDED action if row has no old state', () => {
-      const { tableState, applyTableEdits } = useManageOffices(stateKey)
-      const newOfficeRow = { new: mockOffice, old: undefined }
-      tableState.value = [newOfficeRow]
-
-      const editedOffice = { ...mockOffice, type: OfficeType.RECORDS }
-      applyTableEdits(editedOffice as any, mockRow(0, newOfficeRow))
-
-      expect(tableState.value[0]!.new.actions).toHaveLength(1)
-      expect(tableState.value[0]!.new.actions).toContain(ActionType.ADDED)
-    })
-
-    it('should add ADDRESS_CHANGED action if addresses are different', () => {
-      const { tableState, applyTableEdits } = useManageOffices(stateKey)
-      const existing = {
-        new: mockOffice,
-        old: { ...mockOffice, address: { ...mockOffice.address, sameAs: false } }
-      }
-      tableState.value = [existing]
-
-      applyTableEdits(mockOffice as any, mockRow(0, existing))
-
-      expect(tableState.value[0]!.new.actions).toHaveLength(1)
-      expect(tableState.value[0]!.new.actions).toContain(ActionType.ADDRESS_CHANGED)
-    })
-
-    it('should have no actions if edited data matches old state exactly', () => {
-      const { tableState, applyTableEdits } = useManageOffices(stateKey)
-      const existing = { new: mockOffice, old: mockOffice }
-      tableState.value = [existing]
-
-      applyTableEdits(mockOffice as any, mockRow(0, existing))
-
-      expect(tableState.value[0]!.new.actions).toHaveLength(0)
     })
   })
 })

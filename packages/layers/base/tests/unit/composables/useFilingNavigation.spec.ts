@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 
 const identifier = 'BC1234567'
-const testAccountId = 'test-account-id'
 
 const mockRoute = reactive({
   params: { businessId: identifier },
@@ -10,16 +9,13 @@ const mockRoute = reactive({
 })
 mockNuxtImport('useRoute', () => () => mockRoute)
 
-mockNuxtImport('useRuntimeConfig', () => () => ({
-  public: {
-    businessDashboardUrl: 'http://dashboard/',
-    businessEditUrl: 'http://edit/'
-  }
+const testAccountId = 'test-account-id'
+mockNuxtImport('useConnectAccountStore', () => () => ({
+  currentAccount: { id: testAccountId, accountType: 'Basic' }
 }))
 
-mockNuxtImport('useConnectAccountStore', () => () => ({
-  currentAccount: { id: testAccountId }
-}))
+let mockIsStaff = false
+mockNuxtImport('useIsStaff', () => () => computed(() => mockIsStaff))
 
 mockNuxtImport('useBusinessStore', () => () => ({
   business: { legalName: 'Test Business Inc.', identifier: 'BC1234567' }
@@ -28,6 +24,7 @@ mockNuxtImport('useBusinessStore', () => () => ({
 describe('useFilingNavigation', () => {
   beforeEach(() => {
     mockRoute.query = {}
+    mockIsStaff = false
     vi.clearAllMocks()
   })
 
@@ -85,6 +82,70 @@ describe('useFilingNavigation', () => {
 
       expect(isDraft.value).toBe(true)
       expect(breadcrumbs.value[2]!.label).toBe('Test Business Inc.')
+    })
+
+    it('should return correct breadcrumbs when user is Staff', async () => {
+      const { breadcrumbs } = useFilingNavigation('Some Filing Label')
+
+      mockIsStaff = true
+
+      expect(breadcrumbs.value).toHaveLength(4)
+
+      const bc1 = breadcrumbs.value[0]
+      expect(bc1).toEqual({
+        appendAccountId: true,
+        external: true,
+        label: 'Staff Dashboard',
+        to: 'https://auth.example.com/staff/dashboard/active'
+      })
+
+      const bc2 = breadcrumbs.value[1]
+      expect(bc2).toEqual({
+        external: true,
+        label: 'My Staff Business Registry',
+        to: 'http://brd/account/test-account-id'
+      })
+
+      const bc3 = breadcrumbs.value[2]
+      expect(bc3).toEqual({
+        external: true,
+        label: 'Test Business Inc.',
+        to: 'http://dashboard/BC1234567?accountid=test-account-id'
+      })
+
+      const bc4 = breadcrumbs.value[3]
+      expect(bc4).toEqual({ label: 'Some Filing Label' })
+    })
+
+    it('should return correct breadcrumbs when user is NOT Staff', async () => {
+      const { breadcrumbs } = useFilingNavigation('Some Filing Label')
+
+      expect(breadcrumbs.value).toHaveLength(4)
+
+      const bc1 = breadcrumbs.value[0]
+      expect(bc1).toEqual({
+        appendAccountId: true,
+        external: true,
+        label: 'BC Registries Dashboard',
+        to: 'http://registry-home/dashboard'
+      })
+
+      const bc2 = breadcrumbs.value[1]
+      expect(bc2).toEqual({
+        external: true,
+        label: 'My Business Registry',
+        to: 'http://brd/account/test-account-id'
+      })
+
+      const bc3 = breadcrumbs.value[2]
+      expect(bc3).toEqual({
+        external: true,
+        label: 'Test Business Inc.',
+        to: 'http://dashboard/BC1234567?accountid=test-account-id'
+      })
+
+      const bc4 = breadcrumbs.value[3]
+      expect(bc4).toEqual({ label: 'Some Filing Label' })
     })
   })
 })

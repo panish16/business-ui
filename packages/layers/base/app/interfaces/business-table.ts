@@ -4,6 +4,7 @@ import type { TableColumn } from '@nuxt/ui'
 export interface TableBusinessState<T> {
   old?: T
   new: T
+  modifiedByStaff?: boolean
 }
 
 export type TableBusinessRow<T> = Row<TableBusinessState<T>>
@@ -14,7 +15,8 @@ export type TableBusinessColumnMeta<T> = TableColumn<TableBusinessState<T>>['met
 
 export type TableColumnMetaOption = 'default' | 'first' | 'last'
 
-export type TablePartyColumnName = 'name' | 'roles' | 'delivery' | 'mailing' | 'effectiveDates' | 'actions'
+export type TablePartyColumnName
+  = 'name' | 'roles' | 'delivery' | 'mailing' | 'effectiveDates' | 'email' | 'actions'
 
 /** Display-level label overrides for table action buttons and badges */
 export interface TableLabelOverrides {
@@ -22,4 +24,6 @@ export interface TableLabelOverrides {
   editLabel?: string
   /** Override badge text for specific action types (e.g. { ADDRESS_CHANGED: 'CORRECTED' }) */
   badges?: Partial<Record<ActionType, string>>
+  /** Marks an incomplete mailing / delivery address in its cell with this text (e.g. "Missing information") */
+  invalidAddress?: string
 }

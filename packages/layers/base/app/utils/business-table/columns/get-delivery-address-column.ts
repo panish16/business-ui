@@ -1,9 +1,10 @@
 import { TableColumnDeliveryAddress } from '#components'
 import { h } from 'vue'
-import { DELETED_CLASS } from './constants'
+import { CEASED_CLASS, DELETED_CLASS } from './constants'
 
 export function getDeliveryAddressColumn<T extends { address: AddressSchema, actions: ActionType[] }>(
-  metaOption: TableColumnMetaOption = 'default'
+  metaOption: TableColumnMetaOption = 'default',
+  invalidAddressLabel?: string
 ): TableBusinessColumn<T> {
   const t = useNuxtApp().$i18n.t
   const meta = getColumnMeta<T>(metaOption)
@@ -20,7 +21,8 @@ export function getDeliveryAddressColumn<T extends { address: AddressSchema, act
         TableColumnDeliveryAddress,
         {
           data: row.original.new.address,
-          class: [defaultClass, isRemoved ? DELETED_CLASS : '']
+          invalidLabel: invalidAddressLabel,
+          class: [defaultClass, isRemoved ? DELETED_CLASS : '', getIsRowCeased(row) ? CEASED_CLASS : '']
         },
         () => []
       )

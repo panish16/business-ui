@@ -14,6 +14,11 @@ export function useAffiliationNavigation () {
     return navigateTo(decodeURIComponent(redirectURL), { external: true })
   }
 
+  /** Navigation handler for the View Access screen. Internal to this app, so no external redirect. */
+  function goToViewAccess (businessIdentifier: string) {
+    return navigateTo(`/business/${businessIdentifier}/viewAccess`)
+  }
+
   /** Navigation handler for Name Request application. */
   function goToNameRequest (nameRequest: NameRequest | undefined) {
     if (nameRequest) {
@@ -144,12 +149,18 @@ export function useAffiliationNavigation () {
       return false
     }
 
+    // businesses not loaded in LEAR are managed in COLIN -- show external icon
+    if (isColinManaged(item)) {
+      return true
+    }
+
     // existing businesses will route to Business Dashboard -- don't show external icon
     return false
   }
 
   return {
     goToDashboard,
+    goToViewAccess,
     goToNameRequest,
     goToCorpOnline,
     goToFormPage,

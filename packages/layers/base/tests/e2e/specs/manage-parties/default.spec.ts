@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test'
 
-import { RoleType } from '#business/app/enums/role-type'
-import { fillOutName, fillOutRoles, selectDone } from '#business/tests/e2e/test-utils'
+import { RoleType, RoleTypeUi } from '#business/app/enums/role-type'
+import { ROLE_FIELD_CONFIG } from '#business/app/utils/schemas/party/roles'
+import { fillOutRoles, fillOutName, fillOutEmail, selectCancel, selectDone } from '#business/tests/e2e/test-utils'
 
 // FUTURE: flush this out
 test.describe('ManageParties', () => {
   test('Should render table with expected data', async ({ page }) => {
-    await page.goto('./en-CA/examples/components/ManageParties')
+    await page.goto('./en-CA/examples/components/Manage/Parties')
     await page.waitForLoadState('networkidle')
 
     const manageParties = page.getByTestId('manage-parties')
@@ -17,16 +18,38 @@ test.describe('ManageParties', () => {
     expect(rows.length).toBe(3)
     // has expected columns
     const columns = await rows[0]!.locator('td').all()
-    expect(columns.length).toBe(5)
-    expect(columns[0]!).toHaveText('TESTER  TESTING')
-    expect(columns[1]!).toContainText('5-14505 Boul De Pierrefonds,')
-    expect(columns[2]!).toHaveText('Same as Mailing Address')
-    expect(columns[3]!).toContainText('Director')
-    expect(columns[4]!).toContainText('Change')
+    expect(columns.length).toBe(6)
+    await expect(columns[0]!).toHaveText('TESTER TESTING')
+    await expect(columns[1]!).toContainText('5-14505 Boul De Pierrefonds,')
+    await expect(columns[2]!).toHaveText('Same as Mailing Address')
+    await expect(columns[3]!).toContainText('Director')
+    await expect(columns[4]!).toContainText('August 16, 2023 to current')
+    await expect(columns[5]!).toContainText('Change')
+  })
+
+  // allowPreferredName is not set in the example, so this verifies the default (false)
+  test('Should not allow a preferred name by default', async ({ page }) => {
+    await page.goto('./en-CA/examples/components/Manage/Parties')
+    await page.waitForLoadState('networkidle')
+
+    const manageParties = page.getByTestId('manage-parties')
+
+    const rows = await manageParties.getByRole('table').locator('tbody').getByRole('row').all()
+    const columns = await rows[0]!.locator('td').all()
+    // edit first party
+    const changeBtn = columns[5]!.getByRole('button', { name: 'change' })
+    await expect(changeBtn).toBeVisible()
+    await changeBtn.click()
+
+    await expect(page.getByTestId('first-name-input')).toBeVisible()
+    await expect(page.getByRole(
+      'checkbox', { name: 'This person also has another name they prefer to use' })
+    ).toHaveCount(0)
+    await expect(page.getByTestId('preferred-name-input')).toHaveCount(0)
   })
 
   test('Should be able to add a preferred name', async ({ page }) => {
-    await page.goto('./en-CA/examples/components/ManageParties')
+    await page.goto('./en-CA/examples/components/Manage/Parties/with-configurable-fields')
     await page.waitForLoadState('networkidle')
 
     const preferredName = 'PreferredName'
@@ -36,16 +59,16 @@ test.describe('ManageParties', () => {
     const rows = await manageParties.getByRole('table').locator('tbody').getByRole('row').all()
     const columns = await rows[0]!.locator('td').all()
     // verify name
-    await expect(columns[0]!).toHaveText('TESTER  TESTING')
+    await expect(columns[0]!).toHaveText('CASEY CUSTODIAN')
     // edit first party
-    const changeBtn = columns[4]!.getByRole('button', { name: 'change' })
+    const changeBtn = columns[5]!.getByRole('button', { name: 'change' })
     await expect(changeBtn).toBeVisible()
     await changeBtn.click()
     // edit name
     const entity: BusinessEntity = {
       alternateName: preferredName,
-      familyName: 'Testing',
-      givenName: 'Tester',
+      familyName: 'Custodian',
+      givenName: 'Casey',
       middleInitial: '',
       businessName: '',
       businessIdentifier: '',
@@ -53,16 +76,17 @@ test.describe('ManageParties', () => {
       identifier: ''
     }
     await fillOutName(page, entity)
+    await fillOutEmail(page, 'casey.custodian@example.com')
     await selectDone(page)
 
     // should now have preferred name as well
-    await expect(columns[0]!).toContainText('TESTER  TESTING')
+    await expect(columns[0]!).toContainText('CASEY CUSTODIAN')
     await expect(columns[0]!).toContainText('Preferred Name:')
     await expect(columns[0]!).toContainText(preferredName)
   })
 
   test('Should be able to select roles', async ({ page }) => {
-    await page.goto('./en-CA/examples/components/ManageParties')
+    await page.goto('./en-CA/examples/components/Manage/Parties')
     await page.waitForLoadState('networkidle')
 
     const manageParties = page.getByTestId('manage-parties')
@@ -81,16 +105,60 @@ test.describe('ManageParties', () => {
     const rows = await manageParties.getByRole('table').locator('tbody').getByRole('row').all()
     const columns = await rows[0]!.locator('td').all()
     // edit first party
-    const changeBtn = columns[4]!.getByRole('button', { name: 'change' })
+    const changeBtn = columns[5]!.getByRole('button', { name: 'change' })
     await expect(changeBtn).toBeVisible()
     await changeBtn.click()
     // role selection
     await fillOutRoles(page, roles)
+    await fillOutEmail(page, 'tester.testing@example.com')
     await selectDone(page)
 
     // should display all roles
     for (const role of roles) {
       await expect(columns[3]!).toContainText(role.roleType)
     }
+  })
+
+  test('Should show/hide effective date field for Director role per config', async ({ page }) => {
+    await page.goto('./en-CA/examples/components/Manage/Parties')
+    await page.waitForLoadState('networkidle')
+
+    const manageParties = page.getByTestId('manage-parties')
+    const tbody = manageParties.getByRole('table').locator('tbody')
+
+    // find first row that contains a Director role
+    const directorRow = tbody.getByRole('row').filter({ hasText: RoleType.DIRECTOR }).first()
+    await directorRow.getByRole('button', { name: 'change' }).click()
+
+    // effective date input visibility is driven by config, not hardcoded to this role
+    const shouldShowEffectiveDate = !!ROLE_FIELD_CONFIG[RoleTypeUi.DIRECTOR]?.effectiveDate
+    const effectiveDateInput = page.getByTestId('party-details-form').getByLabel('Effective Date')
+    if (shouldShowEffectiveDate) {
+      await expect(effectiveDateInput).toBeVisible()
+    } else {
+      await expect(effectiveDateInput).not.toBeVisible()
+    }
+
+    await selectCancel(page)
+  })
+
+  test('Should show cessation date field and hide roles for a ceased Director', async ({ page }) => {
+    await page.goto('./en-CA/examples/components/Manage/Parties/with-ceased-director')
+    await page.waitForLoadState('networkidle')
+
+    // the store has a Director with a cessation date, shown in the ceased tab of the correction
+    const manageParties = page.getByTestId('manage-parties').first()
+    await manageParties.getByTestId('parties-tab-ceased').click()
+    const ceasedRow = manageParties.getByRole('table').locator('tbody').getByRole('row')
+      .filter({ hasText: 'Ceased Director' }).first()
+    await ceasedRow.getByRole('button', { name: 'correct' }).click()
+
+    const partyDetailsForm = page.getByTestId('party-details-form')
+    // the cessation date is shown together with the effective date as a Start Date/End Date range
+    await expect(partyDetailsForm.getByLabel('End Date')).toBeVisible()
+    // a ceased party's roles can't be changed
+    await expect(partyDetailsForm.getByTestId('party-role-options')).not.toBeVisible()
+
+    await selectCancel(page)
   })
 })

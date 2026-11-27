@@ -46,6 +46,8 @@ export interface CorrectionPayload extends FilingPayloadData {
     extension?: string
   }
 
+  courtOrders?: Partial<CourtOrderPayload>[]
+
   // Name-related corrections
   nameRequest?: {
     legalName: string
@@ -53,12 +55,7 @@ export interface CorrectionPayload extends FilingPayloadData {
     nrNumber?: string
   }
 
-  nameTranslations?: Array<{
-    id?: string
-    name: string
-    oldName?: string
-    action?: string
-  }>
+  nameTranslations?: NameTranslation[]
 
   // Office corrections
   offices?: ApiEntityOfficeAddress
@@ -72,13 +69,20 @@ export interface CorrectionPayload extends FilingPayloadData {
   // UI submits with `actions` (plural) array — using flexible type for both directions
   shareStructure?: {
     shareClasses: Array<ShareClass & { action?: string, actions?: ActionType[] }>
-    resolutionDates?: string[]
+    resolutionDates?: Resolution[]
   }
 
+  amalgamation?: Amalgamation
   // TODO: add additional correction-specific fields as needed
   // memorandum?: unknown
   // rules?: unknown
   // resolution?: unknown
+
+  continuationIn?: BusinessDataExtended['continuationIn']
+
+  continuationOut?: BusinessDataExtended['continuationOut']
+
+  amalgamationOut?: BusinessDataExtended['amalgamationOut']
 }
 
 export interface CorrectionFiling {

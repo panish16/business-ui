@@ -4,12 +4,20 @@ export const useBusinessParty = () => {
   async function getBusinessParties(
     businessId: string,
     roleClass?: RoleClass,
-    roleType?: RoleType
+    roleType?: RoleType,
+    all?: boolean,
+    date?: string,
+    force = false
   ): Promise<TableBusinessState<PartySchema>[] | undefined> {
     const resp = await service.getParties(businessId, {
       ...(roleClass ? { classType: roleClass } : {}),
-      ...(roleType ? { role: roleType } : {})
-    })
+      ...(roleType ? { role: roleType } : {}),
+      // include ceased parties (the API otherwise only returns active parties)
+      // NB: the api applies `all` after parsing `date`, so passing both discards the as-of date
+      ...(all ? { all: true } : {}),
+      // parties as of a specific date (YYYY-MM-DD), e.g. a backdated change of directors
+      ...(date ? { date } : {})
+    }, force)
 
     return resp.map(p => ({
       new: formatPartyUi(p, roleType),

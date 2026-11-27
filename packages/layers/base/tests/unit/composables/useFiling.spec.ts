@@ -1,10 +1,21 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { getBusinessMock, getBusinessSettingsMock } from '#test-mocks/business'
 import { getPermissionsMock } from '#test-mocks/business-permissions'
 import { getPartiesMock } from '#test-mocks/parties'
 import { getFilingMock } from '#test-mocks/filing'
+import { setActivePinia, createPinia } from 'pinia'
+
+const mockBusinessInit = vi.fn()
+mockNuxtImport('useBusinessStore', () => () => ({
+  init: mockBusinessInit,
+  isAllowedFiling: vi.fn(() => true)
+}))
+
+const mockSetFilingDefault = vi.fn()
+mockNuxtImport('useBusinessTombstone', () => () => ({
+  setFilingDefault: mockSetFilingDefault
+}))
 
 const identifier = 'BC1234567'
 
@@ -13,9 +24,17 @@ const mockBusinessService = {
   getAuthorizedActions: vi.fn(),
   getBusiness: vi.fn(),
   getParties: vi.fn(),
-  getAndValidateDraftFiling: vi.fn()
+  getAndValidateDraftFiling: vi.fn(),
+  getFilingChanges: vi.fn(),
+  getResolutions: vi.fn(),
+  getAddresses: vi.fn(),
+  getShareClasses: vi.fn(),
+  getNameTranslations: vi.fn()
 }
 mockNuxtImport('useBusinessService', () => () => mockBusinessService)
+
+const mockGetFeatureFlag = vi.fn().mockResolvedValue(false)
+mockNuxtImport('useConnectLaunchDarkly', () => () => ({ getFeatureFlag: mockGetFeatureFlag }))
 
 const mockErrorModalOpen = vi.fn()
 const mockBaseModalOpen = vi.fn()
@@ -35,13 +54,12 @@ mockNuxtImport('useConnectAccountStore', () => () => ({ currentAccount: { id: 12
 mockNuxtImport('useConnectAuth', () => () => ({ authUser: { value: { fullName: 'Test User' } } }))
 
 describe('useFiling', () => {
-  beforeEach(async () => {
-    vi.resetAllMocks()
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   describe('initFiling', () => {
-    let businessStore: ReturnType<typeof useBusinessStore>
-    let businessPermissionsStore: ReturnType<typeof useBusinessPermissionsStore>
     const businessMock = getBusinessMock([{ key: 'identifier', value: identifier }])
     const businessPermissionsMock = getPermissionsMock()
     const businessSettingsMock = getBusinessSettingsMock()
@@ -49,19 +67,14 @@ describe('useFiling', () => {
     const draftFilingMock = getFilingMock('changeOfOfficers', 'DRAFT')
 
     beforeEach(async () => {
-      vi.resetAllMocks()
-      const pinia = createPinia()
-      setActivePinia(pinia)
-      businessStore = useBusinessStore()
-      businessStore.$reset()
-      businessPermissionsStore = useBusinessPermissionsStore()
-      businessPermissionsStore.$reset()
+      vi.clearAllMocks()
       mockBusinessService.getBusiness.mockResolvedValue(businessMock.business)
       mockBusinessService.getAuthInfo.mockResolvedValue(businessSettingsMock)
       mockBusinessService.getParties.mockResolvedValue(partiesMock.parties)
       mockBusinessService.getAndValidateDraftFiling.mockResolvedValue(draftFilingMock)
       mockBusinessService.getAuthorizedActions.mockResolvedValue(businessPermissionsMock.authorizedPermissions)
     })
+
     describe('when initializing a filing (non draft)', () => {
       test('should initialize business, permissions, fee, and filing tombstone data', async () => {
         // init
@@ -74,24 +87,8 @@ describe('useFiling', () => {
         expect(draftFiling).toBeUndefined()
         expect(parties).toBeUndefined()
         // business store
-        expect(businessStore.business).toBeDefined()
-        expect(businessStore.businessName).toBe(businessMock.business.legalName)
-        expect(businessStore.businessIdentifier).toBe(identifier)
-        expect(businessStore.businessFolio).toBe(businessSettingsMock.folioNumber)
-        expect(businessStore.businessContact).toEqual(businessSettingsMock.contacts[0])
-        // business permissions store
-        expect(businessPermissionsStore.authorizedActions).toEqual(businessPermissionsMock.authorizedPermissions)
-        // tombstone
-        const { businessTombstone } = useBusinessTombstone()
-        expect(businessTombstone.value.title.text).toBe(businessStore.businessName)
-        expect(businessTombstone.value.subtitles).toEqual([{ text: 'BC Limited Company' }])
-        expect(businessTombstone.value.details).toEqual([])
-        expect(businessTombstone.value.sideDetails).toEqual([
-          { label: 'Business Number', value: '882156342BC0001' },
-          { label: 'Incorporation Number', value: identifier },
-          { label: 'Email', value: 'fake.email@gov.bc.ca' },
-          { label: 'Phone', value: '(778) 996-7591' }
-        ])
+        expect(mockBusinessInit).toHaveBeenCalledOnce()
+        expect(mockSetFilingDefault).toHaveBeenCalledOnce()
       })
 
       test('should return parties when applicable', async () => {
@@ -99,9 +96,7 @@ describe('useFiling', () => {
         const { parties } = await useFiling().initFiling(
           identifier,
           FilingType.CHANGE_OF_OFFICERS,
-          undefined,
-          undefined,
-          { roleClass: RoleClass.OFFICER }
+          { parties: { roleClass: RoleClass.OFFICER } }
         )
 
         // assert
@@ -123,13 +118,14 @@ describe('useFiling', () => {
       const draftId = 'draft123'
 
       test('should return the mock draft information and getParties should still be called', async () => {
+        mockBusinessService.getFilingChanges.mockResolvedValue({
+          upToDate: true, changedSections: [], draftSections: [], conflicts: [], alreadyApplied: [], absorbed: []
+        })
         // init store
         const { draftFiling, parties } = await useFiling().initFiling(
           identifier,
           FilingType.CHANGE_OF_OFFICERS,
-          undefined,
-          draftId,
-          { roleClass: RoleClass.OFFICER }
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
         )
 
         expect(mockErrorModalOpen).not.toHaveBeenCalled()
@@ -140,15 +136,208 @@ describe('useFiling', () => {
         expect(draftFiling).toEqual(draftFilingMock)
       })
 
+      test('should force fresh data and rebase the draft against the changes report', async () => {
+        const currentPartyId = String(partiesMock.parties[0]!.officer.id)
+        const draftRelationship = draftFilingMock.filing.changeOfOfficers.relationships[0]
+        mockBusinessService.getFilingChanges.mockResolvedValue({
+          baseTransactionId: 10,
+          currentTransactionId: 12,
+          upToDate: false,
+          interveningFilings: [],
+          businessChanges: {},
+          changedSections: ['parties'],
+          draftSections: ['parties'],
+          conflicts: [{
+            section: 'parties',
+            entityKey: 'TEST, NEW',
+            rowId: Number(currentPartyId),
+            change: 'modified',
+            paths: ['/deliveryAddress/addressCity'],
+            baseValue: {},
+            currentValue: {},
+            draftValue: draftRelationship
+          }],
+          alreadyApplied: [],
+          absorbed: [],
+          staleIds: { parties: [], nameTranslations: [], resolutions: [], courtOrders: [] }
+        })
+
+        const { draftFiling, parties } = await useFiling().initFiling(
+          identifier,
+          FilingType.CHANGE_OF_OFFICERS,
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
+        )
+
+        expect(mockErrorModalOpen).not.toHaveBeenCalled()
+        // the draft and the parties are fetched fresh
+        expect(mockBusinessService.getAndValidateDraftFiling)
+          .toHaveBeenCalledWith(identifier, draftId, FilingType.CHANGE_OF_OFFICERS, true)
+        expect(mockBusinessService.getParties).toHaveBeenCalledWith(identifier, expect.any(Object), true)
+        expect(mockBusinessInit).toHaveBeenCalledWith(identifier, false, false, true, true)
+        expect(mockBusinessService.getFilingChanges).toHaveBeenCalledWith(identifier, draftId)
+        // the conflicted draft edit is gone, the current row is tagged, the save will carry the base
+        expect(draftFiling!.filing.changeOfOfficers!.relationships).toEqual([])
+        expect(parties!.find(p => p.new.id === currentPartyId)!.modifiedByStaff).toBe(true)
+        expect(parties!.filter(p => p.modifiedByStaff)).toHaveLength(1)
+        expect(useDraftRebase().getSaveOptions()).toEqual({ baseTransactionId: 12 })
+        // the resume alert reads the report and the discarded edit from the composable
+        expect(useDraftRebase().report.value?.currentTransactionId).toBe(12)
+        expect(useDraftRebase().discardedEdits.value).toEqual([
+          expect.objectContaining({ section: 'parties', entityKey: 'TEST, NEW', alreadyApplied: false })
+        ])
+      })
+
+      test('should leave the draft alone when rebase is not enabled for the filing', async () => {
+        // the API 404s the changes report when the feature is off for this filing type
+        mockBusinessService.getFilingChanges.mockRejectedValue({ statusCode: 404 })
+        const { draftFiling, parties } = await useFiling().initFiling(
+          identifier,
+          FilingType.CHANGE_OF_OFFICERS,
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
+        )
+
+        expect(mockBusinessService.getFilingChanges).toHaveBeenCalledOnce()
+        expect(draftFiling).toEqual(draftFilingMock)
+        expect(parties!.some(p => p.modifiedByStaff)).toBe(false)
+        expect(useDraftRebase().getSaveOptions()).toBeUndefined()
+      })
+
+      test('should merge the draft relationships over the fresh parties', async () => {
+        const currentPartyId = String(partiesMock.parties[0]!.officer.id)
+        const draftRelationship = {
+          ...draftFilingMock.filing.changeOfOfficers.relationships[0],
+          entity: {
+            ...draftFilingMock.filing.changeOfOfficers.relationships[0].entity,
+            identifier: currentPartyId,
+            givenName: 'Rebased'
+          },
+          actions: ['NAME_CHANGED']
+        }
+        mockBusinessService.getAndValidateDraftFiling.mockResolvedValue({
+          ...draftFilingMock,
+          filing: { ...draftFilingMock.filing, changeOfOfficers: { relationships: [draftRelationship] } }
+        })
+        mockBusinessService.getFilingChanges.mockRejectedValue({ statusCode: 404 })
+
+        const { parties, draftBody } = await useFiling().initFiling(
+          identifier,
+          FilingType.CHANGE_OF_OFFICERS,
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
+        )
+
+        const merged = parties!.find(p => p.new.id === currentPartyId)!
+        expect(merged.new.name.firstName).toBe('Rebased')
+        expect(merged.new.actions).toEqual(['NAME_CHANGED'])
+        expect(merged.old?.name.firstName).not.toBe('Rebased')
+        expect(parties!.filter(p => p.new.actions.length)).toHaveLength(1)
+        expect(draftBody).toEqual({ relationships: [draftRelationship] })
+      })
+
+      test('should merge the draft offices over the fresh addresses, untouched offices pass through', async () => {
+        const address = {
+          streetAddress: '1 Old St',
+          addressCity: 'Victoria',
+          addressRegion: 'BC',
+          postalCode: 'V8V 8V8',
+          addressCountry: 'CA'
+        }
+        mockBusinessService.getAddresses.mockResolvedValue({
+          registeredOffice: { deliveryAddress: address, mailingAddress: address },
+          recordsOffice: { deliveryAddress: address, mailingAddress: address }
+        })
+        mockBusinessService.getAndValidateDraftFiling.mockResolvedValue({
+          ...draftFilingMock,
+          filing: {
+            ...draftFilingMock.filing,
+            changeOfAddress: {
+              offices: {
+                registeredOffice: {
+                  deliveryAddress: { ...address, streetAddress: '2 New St' },
+                  mailingAddress: address
+                }
+              }
+            }
+          }
+        })
+        mockBusinessService.getFilingChanges.mockRejectedValue({ statusCode: 404 })
+
+        const { addresses } = await useFiling().initFiling(
+          identifier,
+          FilingType.CHANGE_OF_ADDRESS,
+          { draftId, offices: [OfficeType.REGISTERED, OfficeType.RECORDS] }
+        )
+
+        expect(mockBusinessService.getAddresses).toHaveBeenCalledWith(identifier, undefined, true)
+        const registered = addresses!.find(o => o.new.type === OfficeType.REGISTERED)!
+        expect(registered.new.address.deliveryAddress.street).toBe('2 New St')
+        expect(registered.new.actions).toEqual([ActionType.CHANGED])
+        expect(registered.old?.address.deliveryAddress.street).toBe('1 Old St')
+        const records = addresses!.find(o => o.new.type === OfficeType.RECORDS)!
+        expect(records.new.actions).toEqual([])
+      })
+
+      test('should leave read-only offices on the current addresses when mergeDraftOffices is false', async () => {
+        const address = {
+          streetAddress: '1 Old St',
+          addressCity: 'Victoria',
+          addressRegion: 'BC',
+          postalCode: 'V8V 8V8',
+          addressCountry: 'CA'
+        }
+        mockBusinessService.getAddresses.mockResolvedValue({
+          registeredOffice: { deliveryAddress: address, mailingAddress: address }
+        })
+        mockBusinessService.getAndValidateDraftFiling.mockResolvedValue({
+          ...draftFilingMock,
+          filing: {
+            ...draftFilingMock.filing,
+            transition: {
+              offices: {
+                registeredOffice: {
+                  deliveryAddress: { ...address, streetAddress: '2 Stale St' },
+                  mailingAddress: address
+                }
+              }
+            }
+          }
+        })
+        mockBusinessService.getFilingChanges.mockRejectedValue({ statusCode: 404 })
+
+        const { addresses } = await useFiling().initFiling(
+          identifier,
+          FilingType.TRANSITION,
+          { draftId, offices: [OfficeType.REGISTERED], mergeDraftOffices: false }
+        )
+
+        expect(addresses![0]!.new.address.deliveryAddress.street).toBe('1 Old St')
+        expect(addresses![0]!.new.actions).toEqual([])
+      })
+
+      test('should block the draft and open the getDraftChanges error modal when the report fails', async () => {
+        mockBusinessService.getFilingChanges.mockRejectedValue({ statusCode: 500 })
+
+        const { draftFiling, parties } = await useFiling().initFiling(
+          identifier,
+          FilingType.CHANGE_OF_OFFICERS,
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
+        )
+
+        expect(draftFiling).toBeUndefined()
+        expect(parties).toBeUndefined()
+        expect(mockErrorModalOpen).toHaveBeenCalledOnce()
+        expect(mockErrorModalOpen).toHaveBeenCalledWith(expect.objectContaining({
+          error: { statusCode: 500 },
+          i18nPrefix: 'modal.error.filing.getDraftChanges'
+        }))
+      })
+
       test('should open the openGetDraftFilingErrorModal if the draft filing is not valid', async () => {
         mockBusinessService.getAndValidateDraftFiling.mockRejectedValue(new Error('invalid-draft-filing'))
 
         await useFiling().initFiling(
           identifier,
           FilingType.CHANGE_OF_OFFICERS,
-          undefined,
-          draftId,
-          { roleClass: RoleClass.OFFICER }
+          { draftId, parties: { roleClass: RoleClass.OFFICER } }
         )
 
         expect(mockErrorModalOpen).toHaveBeenCalledOnce()
@@ -161,8 +350,7 @@ describe('useFiling', () => {
     })
   })
 
-  describe('createFilingPayload', () => {
-    const { createFilingPayload } = useFiling()
+  describe('formatFilingPayloadApi', () => {
     const business = {
       identifier: 'BC123',
       foundingDate: '2022-01-01T12:00:00Z',
@@ -174,7 +362,7 @@ describe('useFiling', () => {
       const filingName = FilingType.CHANGE_OF_OFFICERS
       const payload = { relationships: [{ entity: { givenName: 'Test' } }] }
 
-      const result = createFilingPayload(business, filingName, { [filingName]: payload })
+      const result = useFiling().formatFilingPayloadApi(business, filingName, { [filingName]: payload })
 
       expect(result).toHaveProperty('filing')
       const filing = result.filing
@@ -199,7 +387,7 @@ describe('useFiling', () => {
         changeOfAddress: { deliveryAddress: { street: '123 Main' } }
       }
 
-      const result = createFilingPayload(business, FilingType.CHANGE_OF_OFFICERS, filings)
+      const result = useFiling().formatFilingPayloadApi(business, FilingType.CHANGE_OF_OFFICERS, filings)
       const filing = result.filing
 
       expect(filing.header.name).toBe('changeOfOfficers')

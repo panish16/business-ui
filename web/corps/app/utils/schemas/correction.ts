@@ -18,12 +18,9 @@ function getClientCorrectionSchema() {
         locationDescription: ''
       }
     })),
-    certify: getCertifySchema().extend({
-      legalName: z.string()
-    }).default({
-      isCertified: false,
-      legalName: ''
-    }),
+    certify: getCertifySchema().default(() => ({
+      isCertified: false
+    })),
     authorization: getConfirmAuthorizationSchema().default(() => ({
       isAuthorized: false
     }))
@@ -51,14 +48,15 @@ export function getCorrectionSchema(isStaff: boolean) {
       folioNumber: '',
       isPriority: false
     })),
-    activeDirector: getActivePartySchema(),
-    activeReceiver: getActivePartySchema(RoleTypeUi.RECEIVER),
-    activeLiquidator: getActivePartySchema(RoleTypeUi.LIQUIDATOR),
+    activeParty: getActivePartySchema(),
     activeOffice: getActiveOfficesSchema(),
-    activeClass: getActiveShareClassSchema(),
-    activeSeries: getActiveShareSeriesSchema(),
+    activeShareStructure: getActiveShareStructureSchema(),
+    resolutionDate: getActiveResolutionDateSchema(),
     activeNameTranslation: getActiveNameTranslationSchema(),
-    activeNameRequest: getActiveNameRequestSchema()
+    activeNameRequest: getActiveNameRequestSchema(),
+    activeCourtOrder: getActiveCourtOrderPoaFullSchema(),
+    activeAmal: getActiveAmalgamationSchema(),
+    activeYourCompany: getActiveYourCompanySchema()
   })
 
   if (isStaff) {

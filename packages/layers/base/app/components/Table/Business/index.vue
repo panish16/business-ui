@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="T extends { actions: ActionType[], isEditing: boolean }">
+<script setup lang="ts" generic="T extends { id?: string, actions: ActionType[], isEditing: boolean }">
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { DropdownMenuItem } from '@nuxt/ui'
 
@@ -8,6 +8,8 @@ const props = defineProps<{
   loading?: boolean
   emptyText?: string
   hideEmptyText?: boolean
+  hideTableHeader?: boolean
+  trDividerFullWidth?: boolean
   allowedActions?: ManageAllowedAction[]
   preventActions?: boolean
   labelOverrides?: TableLabelOverrides
@@ -18,6 +20,7 @@ const props = defineProps<{
   }
   getCustomDropdownItems?: (row: TableBusinessRow<T>) => DropdownMenuItem[]
   hideActionsWhen?: (row: TableBusinessRow<T>) => boolean
+  hideRemove?: boolean
 }>()
 
 defineEmits<{
@@ -29,13 +32,41 @@ defineEmits<{
 
 const expanded = defineModel<ExpandedState | undefined>('expanded', { required: true })
 
-const trClass = '[&:has([data-is-editing="true"])]:hidden'
-
 const showBodyTopSlot = computed(() => {
   if (!props.data || props.data.length === 0 || props.loading) {
     return false
   }
   return props.data.filter(i => !i.new.actions.includes(ActionType.REMOVED)).length === 0
+})
+
+const tableUi = computed(() => {
+  const tbody = [
+    'divide-y-0',
+    props.taskGuardConfig?.message && 'shadow-section-error'
+  ].filter(Boolean).join(' ')
+
+  const thead = [
+    props.taskGuardConfig?.message && 'shadow-section-error',
+    props.hideTableHeader && 'sr-only'
+  ].filter(Boolean).join(' ')
+
+  const tr = [
+    '[&:has([data-is-editing="true"])]:hidden',
+    /* eslint-disable-next-line max-len */
+    "relative after:absolute after:content-[''] after:bottom-0 after:h-px after:bg-gray-200 [thead_&]:first:after:hidden last:after:hidden data-[expanded=true]:after:hidden",
+    props.trDividerFullWidth
+      ? 'after:left-0 after:right-0'
+      : 'after:left-6 after:right-6'
+  ].join(' ')
+
+  return {
+    root: 'bg-white rounded-sm',
+    tbody,
+    th: 'text-neutral-highlighted px-2 bg-white',
+    thead,
+    td: 'text-neutral-highlighted align-top text-sm whitespace-normal p-0',
+    tr
+  }
 })
 </script>
 
@@ -46,15 +77,7 @@ const showBodyTopSlot = computed(() => {
     :loading
     :columns
     sticky
-    :ui="{
-      root: 'bg-white rounded-sm',
-      tbody: `divide-y-0 ${taskGuardConfig?.message ? 'shadow-section-error' : ''}`,
-      th: 'text-neutral-highlighted px-2 bg-white',
-      thead: `${taskGuardConfig?.message ? 'shadow-section-error' : ''}`,
-      td: 'text-neutral-highlighted align-top text-sm whitespace-normal p-0',
-      /* eslint-disable-next-line max-len */
-      tr: `${trClass} relative after:absolute after:content-[''] after:bottom-0 after:left-6 after:right-6 after:h-px after:bg-gray-200 last:after:hidden data-[expanded=true]:after:hidden in-[thead]:after:hidden`
-    }"
+    :ui="tableUi"
   >
     <template #actions-cell="{ row }">
       <div
@@ -69,6 +92,7 @@ const showBodyTopSlot = computed(() => {
         :prevent-actions="preventActions"
         :label-overrides="labelOverrides"
         :get-custom-dropdown-items="getCustomDropdownItems"
+        :hide-remove="hideRemove"
         @init-edit="$emit('init-edit', row)"
         @undo="$emit('undo', row)"
         @remove="$emit('remove', row)"
@@ -94,10 +118,12 @@ const showBodyTopSlot = computed(() => {
 
     <template v-if="showBodyTopSlot" #body-top>
       <tr
-        :class="[
-          `relative after:absolute after:content-['']`,
-          'after:bottom-0 after:left-6 after:right-6 after:h-px after:bg-gray-200'
-        ]"
+        :class="!(props.hideEmptyText && props.hideTableHeader)
+          && [
+            `relative after:absolute after:content-['']`,
+            'after:bottom-0 after:left-6 after:right-6 after:h-px after:bg-gray-200'
+          ]
+        "
       >
         <td :colspan="columns.length">
           <div

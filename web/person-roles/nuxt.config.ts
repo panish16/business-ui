@@ -28,6 +28,7 @@ export default defineNuxtConfig({
     '/': { redirect: '/en-CA' },
     '/en-CA': { redirect: '/en-CA/officer-change' },
     '/en-CA/officer-change': { redirect: '/en-CA/officer-change/undefined' }, // if no slug redirect to undefined, this will display error modal instead of 404 page
+    '/en-CA/manage-directors': { redirect: '/en-CA/manage-directors/undefined' }, // if no slug redirect to undefined, this will display error modal instead of 404 page
     '/en-CA/manage-receivers': { redirect: '/en-CA/manage-receivers/undefined/undefined' }, // if no slug redirect to undefined, this will display error modal instead of 404 page
     '/fr-CA': { prerender: false, redirect: '/fr-CA/officer-change' },
     '/fr-CA/**': { prerender: false }
@@ -70,6 +71,18 @@ export default defineNuxtConfig({
     public: {
       version: `Person Roles UI v${process.env.npm_package_version || ''}`,
       playwright: process.env.playwright === 'true'
+    }
+  },
+
+  typescript: {
+    tsConfig: {
+      exclude: [
+        '../../business-registry-dashboard/**',
+        '../../coops/**',
+        '../../corps/**',
+        '../../registry-home/**',
+        '../../../packages/layers/base/tests/**'
+      ]
     }
   }
 })

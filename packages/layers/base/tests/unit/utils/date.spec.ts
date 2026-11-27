@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 
 describe('date util', () => {
@@ -11,14 +12,14 @@ describe('date util', () => {
       vi.useRealTimers()
     })
 
-    test('should return the current date in UTC by default, in ISO format', () => {
+    test('should return the current date in pacific time by default, in ISO format', () => {
       const result = getToday()
-      expect(result).toBe('2025-06-24')
+      expect(result).toBe('2025-06-23')
     })
 
     test('should return the correct date for a specified timezone', () => {
-      const result = getToday('America/Vancouver')
-      expect(result).toBe('2025-06-23')
+      const result = getToday('UTC')
+      expect(result).toBe('2025-06-24')
     })
 
     test('should return the date in a custom format when provided', () => {
@@ -34,6 +35,24 @@ describe('date util', () => {
     test('should throw an error for an invalid timezone', () => {
       const invalidCall = () => getToday('Earth')
       expect(invalidCall).toThrow(/Invalid timezone/)
+    })
+  })
+
+  describe('toApiDateTime', () => {
+    test('should convert a pacific standard time date to UTC', () => {
+      expect(toApiDateTime('2021-01-01')).toBe('2021-01-01T08:00:00+00:00')
+    })
+
+    test('should convert a pacific daylight time date to UTC', () => {
+      expect(toApiDateTime('2021-07-01')).toBe('2021-07-01T07:00:00+00:00')
+    })
+
+    test('should convert a date in a given timezone', () => {
+      expect(toApiDateTime('2021-07-01', 'UTC')).toBe('2021-07-01T00:00:00+00:00')
+    })
+
+    test('should return undefined for an invalid date', () => {
+      expect(toApiDateTime('not-a-date')).toBeUndefined()
     })
   })
 })

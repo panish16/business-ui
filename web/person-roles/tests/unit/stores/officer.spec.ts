@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { setActivePinia, createPinia } from 'pinia'
 import { mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { getFakePerson, getFakeAddress } from '#e2e-utils'
+import { setActivePinia, createPinia } from 'pinia'
 
 const identifier = 'BC1234567'
 
-const mockCreateFilingPayload = vi.fn()
+const mockFormatFilingPayloadApi = vi.fn()
 const mockSaveOrUpdateDraftFiling = vi.fn()
 const mockPostFiling = vi.fn()
 const mockBusinessService = {
@@ -15,15 +15,12 @@ const mockBusinessService = {
 mockNuxtImport('useBusinessService', () => () => mockBusinessService)
 
 const mockInitFiling = vi.fn()
-vi.mock('#business/app/composables/useFiling', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#business/app/composables/useFiling')>()
+mockNuxtImport('useFiling', original => () => {
+  const orig = typeof original === 'function' ? original() : {}
   return {
-    ...actual,
-    useFiling: () => ({
-      ...actual.useFiling(),
-      initFiling: mockInitFiling,
-      createFilingPayload: mockCreateFilingPayload
-    })
+    ...orig,
+    initFiling: mockInitFiling,
+    formatFilingPayloadApi: mockFormatFilingPayloadApi
   }
 })
 
@@ -54,6 +51,7 @@ function createPartyMock(
       actions,
       name: nameData,
       roles: [{ roleType: RoleTypeUi.PRESIDENT, roleClass: RoleClass.OFFICER }],
+      email: '',
       address: {
         mailingAddress: formatAddressUi(addressData.mailing),
         deliveryAddress: formatAddressUi(addressData.delivery),
@@ -69,16 +67,21 @@ const mailing = getFakeAddress()
 const delivery = getFakeAddress()
 
 describe('useOfficerStore', () => {
-  const store = useOfficerStore()
-  const { tableState } = useManageParties()
-  const schemaDefault = getOfficersSchema().parse({})
+  let store: ReturnType<typeof useOfficerStore>
+  let tableState: ReturnType<typeof useManageParties>['tableState']
+  let schemaDefault: OfficersFormSchema
 
   beforeEach(() => {
-    vi.resetAllMocks()
-    const pinia = createPinia()
-    setActivePinia(pinia)
-    store.$reset()
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+
+    store = useOfficerStore()
+
+    const parties = useManageParties()
+    tableState = parties.tableState
     tableState.value = []
+
+    schemaDefault = getOfficersSchema().parse({})
     mockGetFeatureFlag.mockResolvedValue('BC')
   })
 
@@ -208,7 +211,7 @@ describe('useOfficerStore', () => {
         store.draftFilingState = {} as OfficersDraftState
       }
 
-      mockCreateFilingPayload.mockReturnValue({ filing: {} })
+      mockFormatFilingPayloadApi.mockReturnValue({ filing: {} })
       mockSaveOrUpdateDraftFiling.mockResolvedValue({ filing: { header: { filingId: 'new-id' } } })
       mockPostFiling.mockResolvedValue({ filing: { header: { filingId: 'final-id' } } })
 

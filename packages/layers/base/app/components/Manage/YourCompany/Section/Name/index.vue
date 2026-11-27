@@ -1,0 +1,147 @@
+<script setup lang="ts">
+// The legal company name in the new jurisdiction after an Amalgamation Out or Continuation Out filing
+const {
+  isReadOnlyVariant,
+  fieldOverrides
+} = defineProps<{
+  stateKey: string
+  fields: ManageYourCompanyFields
+  loading?: boolean
+  labelOverrides?: TableLabelOverrides
+  isReadOnlyVariant?: boolean
+  fieldOverrides?: ManageYourCompanyProps['fieldOverrides']
+
+  // NB: These options do not apply to corrections - removing until needed
+  // correctNameOptions?: CorrectNameOption[]
+  // nrAllowedActionsTypes?: NrRequestActionCode[]
+  // business?: BusinessData | BusinessDataPublic
+}>()
+
+defineEmits<{
+  'done': []
+  'cancel': []
+  'init-edit': [key: keyof ManageYourCompanyFields]
+  'undo': [key: keyof ManageYourCompanyFields]
+}>()
+
+const model = defineModel<ActiveYourCompanySchema>()
+
+const { getIsVisible, getIsReadOnly } = useManageYourCompanyFieldOverrides(
+  () => fieldOverrides,
+  () => isReadOnlyVariant
+)
+
+const isVisible = computed(() => ({
+  nameRequest: getIsVisible('nameRequest'),
+  nameNewJurisdiction: getIsVisible('nameNewJurisdiction'),
+  namePreviousJurisdiction: getIsVisible('namePreviousJurisdiction')
+}))
+
+const isReadOnly = computed(() => ({
+  nameRequest: getIsReadOnly('nameRequest'),
+  nameNewJurisdiction: getIsReadOnly('nameNewJurisdiction'),
+  namePreviousJurisdiction: getIsReadOnly('namePreviousJurisdiction')
+}))
+
+defineOptions({
+  inheritAttrs: false
+})
+</script>
+
+<template>
+  <div>
+    <ManageYourCompanyFieldRow
+      v-if="isVisible.nameRequest"
+      v-model="model"
+      :state-key
+      field-key="nameRequest"
+      :field-state="fields.nameRequest"
+      :label="$t('label.companyName')"
+      :loading
+      :label-overrides
+      :is-read-only-variant="isReadOnly.nameRequest"
+      :display-value="fields.nameRequest?.value?.legalName"
+      padding-class="py-4 sm:py-5 padding-x-default"
+      name="value.legalName"
+      @init-edit="$emit('init-edit', $event)"
+      @undo="$emit('undo', $event)"
+      @done="$emit('done')"
+      @cancel="$emit('cancel')"
+    >
+      <ConnectInput
+        v-if="model && model.key === 'nameRequest'"
+        id="name-request-name"
+        v-model="model.value.legalName"
+        :label="$t('label.companyName')"
+      />
+    </ManageYourCompanyFieldRow>
+
+    <!-- NB: Leaving as a reference, not necessary for corrections (only free text edit enabled for corrections) -->
+    <!-- <ManageYourCompanySectionNameLegal
+      v-if="isVisible.nameRequest"
+      v-model="model"
+      :field-state="fields.nameRequest"
+      :loading
+      :state-key
+      :is-read-only-variant="isReadOnly.nameRequest"
+      :label-overrides
+      :business
+      :correct-name-options
+      :nr-allowed-actions-types
+      @init-edit="$emit('init-edit', 'nameRequest')"
+      @undo="$emit('undo', 'nameRequest')"
+      @done="$emit('done')"
+      @cancel="$emit('cancel')"
+    /> -->
+
+    <!-- The legal company name in the new jurisdiction after an Amalgamation Out or Continuation Out filing -->
+    <ManageYourCompanyFieldRow
+      v-if="isVisible.nameNewJurisdiction"
+      v-model="model"
+      :state-key
+      field-key="nameNewJurisdiction"
+      :field-state="fields.nameNewJurisdiction"
+      :label="$t('label.nameInNewJurisdiction')"
+      :loading
+      :label-overrides
+      :is-read-only-variant="isReadOnly.nameNewJurisdiction"
+      indent
+      @init-edit="$emit('init-edit', $event)"
+      @undo="$emit('undo', $event)"
+      @done="$emit('done')"
+      @cancel="$emit('cancel')"
+    >
+      <ConnectInput
+        v-if="model && model.key === 'nameNewJurisdiction'"
+        id="new-jurisdiction-name"
+        v-model="model.value"
+        :label="$t('label.enterNameInNewJurisdiction')"
+      />
+    </ManageYourCompanyFieldRow>
+
+    <!-- The legal company name in the previous jurisdiction after a Continuation In filing -->
+    <ManageYourCompanyFieldRow
+      v-if="isVisible.namePreviousJurisdiction"
+      v-model="model"
+      :state-key
+      field-key="namePreviousJurisdiction"
+      :field-state="fields.namePreviousJurisdiction"
+      :label="$t('label.nameInPreviousJurisdiction')"
+      :loading
+      :label-overrides
+      :is-read-only-variant="isReadOnly.namePreviousJurisdiction"
+      indent
+      @init-edit="$emit('init-edit', $event)"
+      @undo="$emit('undo', $event)"
+      @done="$emit('done')"
+      @cancel="$emit('cancel')"
+    >
+      <ConnectInput
+        v-if="model && model.key === 'namePreviousJurisdiction'"
+        id="previous-jurisdiction-name"
+        v-model="model.value"
+        :label="$t('label.enterNameInPreviousJurisdiction')"
+      />
+    </ManageYourCompanyFieldRow>
+  </div>
+</template>

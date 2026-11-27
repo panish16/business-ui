@@ -37,8 +37,8 @@ export interface ApiBaseAddressObj {
 }
 
 export interface UiBaseAddressObj {
-  mailingAddress: ConnectAddress | AddressSchema['mailingAddress']
-  deliveryAddress: ConnectAddress | AddressSchema['deliveryAddress']
+  mailingAddress: ConnectAddress | AddressSchema['mailingAddress'] & { id?: string }
+  deliveryAddress: ConnectAddress | AddressSchema['deliveryAddress'] & { id?: string }
   sameAs: boolean
 }
 
@@ -48,6 +48,11 @@ export interface IncorporationAddress {
   // Records Address is required for BCOMPs.
   // Records Address may be optional for other app types.
   recordsOffice?: ApiBaseAddressObj
+}
+
+export interface BusinessAddressesQuery {
+  // addresses as of a specific date (YYYY-MM-DD)
+  date?: string
 }
 
 export interface ApiEntityOfficeAddress {

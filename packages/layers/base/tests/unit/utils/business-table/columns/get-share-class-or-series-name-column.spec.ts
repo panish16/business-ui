@@ -1,7 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TableColumnIdentity } from '#components'
-import { mockGetColumnMeta, mockGetIsRowRemoved, mockGetTableBadges } from '../../../mocks/business-table-utils'
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+
+const { mockGetColumnMeta } = vi.hoisted(() => ({ mockGetColumnMeta: vi.fn() }))
+mockNuxtImport('getColumnMeta', () => mockGetColumnMeta)
+
+const { mockGetIsRowRemoved } = vi.hoisted(() => ({ mockGetIsRowRemoved: vi.fn() }))
+mockNuxtImport('getIsRowRemoved', () => mockGetIsRowRemoved)
+
+const { mockGetTableBadges } = vi.hoisted(() => ({ mockGetTableBadges: vi.fn() }))
+mockNuxtImport('getTableBadges', () => mockGetTableBadges)
 
 describe('getShareClassOrSeriesNameColumn', () => {
   beforeEach(() => {
@@ -78,5 +87,17 @@ describe('getShareClassOrSeriesNameColumn', () => {
     expect(cell.props.labelClass).toContain('opacity-40')
     expect(cell.props.badges).toEqual([])
     expect(mockGetTableBadges).not.toHaveBeenCalledWith(row)
+  })
+
+  it('should render "Not Available" if the name is an empty string', () => {
+    const row = {
+      depth: 0,
+      original: { new: { name: '' } }
+    }
+    const column = getShareClassOrSeriesNameColumn() as any
+
+    const cell = column.cell({ row })
+
+    expect(cell.props.label).toContain('Not Available')
   })
 })

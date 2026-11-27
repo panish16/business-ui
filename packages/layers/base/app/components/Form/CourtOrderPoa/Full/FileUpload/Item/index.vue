@@ -1,0 +1,133 @@
+<script setup lang="ts">
+import { formatBytes } from '../utils'
+import type { ButtonProps } from '@nuxt/ui'
+import { omit } from 'es-toolkit'
+
+// readonly: display only (no remove/undo actions), ex: a filing review step
+const props = defineProps<CourtOrderFileUi & { readonly?: boolean }>()
+
+const fileProps = computed(() => omit(props, ['readonly']))
+
+const emit = defineEmits<{
+  fileAction: [id: string, action: 'cancel' | 'undo' | 'delete' | 'dismiss']
+}>()
+
+const { $businessApi } = useNuxtApp()
+const { t } = useI18n()
+
+const { data } = useQuery({
+  key: () => ['documents-client-blob', props.fileKey ?? null],
+  query: () => $businessApi<Blob>(`documents/client/${props.fileKey}`, {
+    responseType: 'blob' as 'json'
+  }),
+  staleTime: 2 * 60000,
+  enabled: () => !!props.fileKey
+})
+
+const fileSize = computed(() => {
+  const bytes = data.value?.size
+  return bytes ? formatBytes(bytes) : undefined
+})
+
+const actionProps = computed(() => {
+  if (props.status === CourtOrderFileStatus.LOADING) {
+    return {
+      label: t('label.cancel'),
+      ariaLabel: t('label.cancelUploadOfFilename', { filename: props.name }),
+      icon: 'i-mdi-close',
+      onClick: () => emit('fileAction', props.id, 'cancel')
+    }
+  }
+
+  if (props.status === CourtOrderFileStatus.ERROR) {
+    return {
+      label: t('label.dismiss'),
+      ariaLabel: t('label.dismissError'),
+      icon: 'i-mdi-close',
+      class: 'text-neutral-highlighted hover:text-text-neutral-highlighted/75'
+        + ' active:text-text-neutral-highlighted/75 focus-visible:ring-text-neutral-highlighted',
+      onClick: () => emit('fileAction', props.id, 'dismiss')
+    }
+  }
+
+  const actionMap: Record<CourtOrderFileAction, ButtonProps & { ariaLabel: string }> = {
+    [CourtOrderFileAction.NONE]: {
+      label: t('label.delete'),
+      ariaLabel: `${t('label.delete')} ${props.name}`,
+      icon: 'i-mdi-delete',
+      onClick: () => emit('fileAction', props.id, 'delete')
+    },
+    [CourtOrderFileAction.ADDED]: {
+      label: t('label.remove'),
+      ariaLabel: `${t('label.remove')} ${props.name}`,
+      icon: 'i-mdi-delete',
+      onClick: () => emit('fileAction', props.id, 'delete')
+    },
+    [CourtOrderFileAction.DELETED]: {
+      label: t('label.undo'),
+      ariaLabel: `${t('label.undo')} ${props.name}`,
+      icon: 'i-mdi-undo',
+      onClick: () => emit('fileAction', props.id, 'undo')
+    }
+  }
+
+  return actionMap[props.action]
+})
+
+defineOptions({
+  inheritAttrs: false
+})
+</script>
+
+<template>
+  <li
+    :class="[
+      'flex gap-4 min-w-0 py-4 last:pb-0 first:pt-2 @container',
+      action === CourtOrderFileAction.DELETED ? 'text-neutral-toned' : ''
+    ]"
+  >
+    <FormCourtOrderPoaFullFileUploadPreview
+      v-bind="fileProps"
+      :blob="data"
+    />
+    <div class="flex flex-col min-w-0 w-full">
+      <div class="flex gap-8 justify-between w-full min-w-0">
+        <FormCourtOrderPoaFullFileUploadItemName
+          v-bind="fileProps"
+          :blob="data"
+          class="-ml-2"
+        />
+        <UButton
+          v-if="!readonly"
+          v-bind="actionProps"
+          variant="link"
+          class="px-2 py-1 h-min gap-1 @max-[350px]:hidden text-base"
+          @keydown.enter.stop
+        />
+      </div>
+      <div class="flex flex-col gap-1 ml-7">
+        <div v-if="status === CourtOrderFileStatus.LOADING" class="flex flex-col gap-1 text-neutral-toned">
+          <span>{{ $t(`label.${(progress ?? 0) >= 95 ? 'processing' : 'uploading'}`) }}...</span>
+          <UProgress
+            :model-value="progress"
+            class="max-w-3xs"
+          />
+          <span v-if="progress" class="ml-5">{{ progress }}%</span>
+        </div>
+        <span v-else class="-mt-1">{{ fileSize }}</span>
+        <UBadge
+          v-if="action === CourtOrderFileAction.DELETED"
+          :class="[DELETED_BADGE_CLASS, 'font-bold text-xs w-min']"
+          :label="$t('badge.deleted')"
+        />
+      </div>
+      <UButton
+        v-if="!readonly"
+        v-bind="actionProps"
+        variant="link"
+        class="px-2 py-1 h-min gap-1 @min-[350px]:hidden ml-4 mt-auto text-base"
+        @keydown.enter.stop
+      />
+    </div>
+  </li>
+</template>

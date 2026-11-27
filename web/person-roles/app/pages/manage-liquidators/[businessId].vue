@@ -151,7 +151,11 @@ async function submitFiling() {
     // in case there was a failure and it saved a draft
     const filingResp = e.response?._data
     const urlParams = useUrlSearchParams()
-    urlParams.draft = String(filingResp?.filing?.header?.filingId)
+    const savedDraftId = filingResp?.filing?.header?.filingId
+    // a response without a filing (eg a stale draft 409) must keep the resumed draft's id in the url
+    if (savedDraftId) {
+      urlParams.draft = String(savedDraftId)
+    }
     await modal.openSaveFilingErrorModal(error)
     handleButtonLoading(false)
     initBeforeUnload()
@@ -241,10 +245,11 @@ onMounted(() => {
         </h1>
         <p>{{ $t(`page.${FILING_TYPE}.${filingSubType}.desc`) }}</p>
       </div>
+      <AlertDraftRebase />
 
       <div class="space-y-4" data-testid="liquidator-info-section">
         <ManageParties
-          v-model:active-party="store.formState.activeParty"
+          v-model:active-subject="store.formState.activeParty"
           :loading="store.initializing"
           :empty-text="$t('text.noLiquidators')"
           :section-title="`1. ${$t('label.liquidatorInfo')}`"
@@ -252,8 +257,11 @@ onMounted(() => {
           :subject="$t('label.liquidator')"
           :allowed-actions="allowedPartyActions"
           :role-type="RoleTypeUi.LIQUIDATOR"
+          :columns-to-display="['name', 'mailing', 'delivery', 'effectiveDates', 'actions']"
           :party-form-props="{
-            partyNameProps: { allowBusinessName: true, allowPreferredName: false }
+            partyNameProps: { allowBusinessName: true, allowPreferredName: false },
+            // a liquidator's delivery address does not need to be a physical location
+            addressFormProps: { noPoBox: false }
           }"
         />
 
@@ -279,7 +287,7 @@ onMounted(() => {
         data-testid="records-office-section"
       >
         <ManageOffices
-          v-model:active-office="store.formState.activeOffice"
+          v-model:active-subject="store.formState.activeOffice"
           :loading="store.initializing"
           :empty-text="$t('text.noOffices')"
           :subject="officeSubject"
@@ -288,6 +296,7 @@ onMounted(() => {
           :table-title="$t('label.offices')"
           :allowed-actions="allowedOfficeActions"
           :allow-add-office-type="OfficeType.LIQUIDATION"
+          :address-form-props="{ bcCanadaOnly: true, noPoBox: true }"
         />
 
         <ConnectFormFieldWrapper

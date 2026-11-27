@@ -1,17 +1,17 @@
 {
   "name": "registry-home",
-  "version": "1.0.1",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": "^24.15.0"
   },
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@11.9.0",
   "license": "BSD-3-Clause",
   "scripts": {
     "build-check": "nuxt build",
     "build": "nuxt generate",
-    "dev": "nuxt dev",
+    "dev": "pnpm nuxt dev --host localhost",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",

@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { ActionType } from '#business/app/enums/action-type'
+import { LiquidatorAppointmentMethod } from '#business/app/enums/liquidator-appointment-method'
 import { LiquidateType } from '#business/app/enums/liquidate-type'
 import { RoleType } from '#business/app/enums/role-type'
 import type { ApiAddress } from '#business/app/interfaces/address'
 import { fillOutAddress, fillOutNewRelationship, selectDone } from '#business/tests/e2e/test-utils'
 import { getBusinessMock, getPartiesMock, getBusinessAddressesMock, mockCommonApiCallsForFiling } from '#test-mocks'
 import { navigateToManageLiquidatorsPage } from '../../test-utils'
+import { isEqualOmit } from '#business/app/utils/is-equal-omit'
 
 const identifier = 'BC1234567'
 const address = {
@@ -13,7 +15,7 @@ const address = {
   streetAddressAdditional: '',
   addressCity: 'city',
   addressCountry: 'CA',
-  addressRegion: 'AB',
+  addressRegion: 'BC',
   deliveryInstructions: '',
   postalCode: 'V1N 4H8'
 }
@@ -29,7 +31,19 @@ const newLiquidator = {
   },
   deliveryAddress: address,
   mailingAddress: address,
-  roles: [{ roleType: RoleType.LIQUIDATOR }]
+  roles: [{
+    roleType: RoleType.LIQUIDATOR,
+    appointmentDate: '2025-12-29',
+    meta: { appointmentMethod: LiquidatorAppointmentMethod.COMPANY }
+  }]
+}
+const newCourtAppointedLiquidator = {
+  ...newLiquidator,
+  roles: [{
+    roleType: RoleType.LIQUIDATOR,
+    appointmentDate: '2025-12-29',
+    meta: { appointmentMethod: LiquidatorAppointmentMethod.COURT, courtOrderNumber: 'S-12345' }
+  }]
 }
 
 test.describe('Manage Liquidators - Submission', () => {
@@ -57,7 +71,7 @@ test.describe('Manage Liquidators - Submission', () => {
       await navigateToManageLiquidatorsPage(page, LiquidateType.INTENT)
       await page.waitForLoadState('networkidle')
       const innerPayload: LiquidatorPayload = {
-        relationships: [newLiquidator],
+        relationships: [newCourtAppointedLiquidator],
         type: LiquidateType.INTENT,
         offices: {
           liquidationRecordsOffice: {
@@ -69,19 +83,19 @@ test.describe('Manage Liquidators - Submission', () => {
       }
 
       const addButton = page.getByRole('button', { name: 'Add Liquidator' })
-      expect(addButton).toBeVisible()
+      await expect(addButton).toBeVisible()
       await addButton.click()
-      await fillOutNewRelationship(page, newLiquidator)
+      await fillOutNewRelationship(page, newCourtAppointedLiquidator)
       const officeParent = page.getByTestId('records-office-section')
       await officeParent.getByRole('button', { name: 'Add Liquidation Records Office' }).click()
       await fillOutAddress(page, address, 'mailing', true, officeParent)
       await officeParent.getByRole('button', { name: 'Done' }).click()
       const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-      expect(staffNoFeeRadio).toBeVisible()
+      await expect(staffNoFeeRadio).toBeVisible()
       await staffNoFeeRadio.click()
 
       const submitBtn = page.getByRole('button', { name: 'Submit' })
-      expect(submitBtn).toBeVisible()
+      await expect(submitBtn).toBeVisible()
       const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
       await submitBtn.click()
       const request = await submitRequest
@@ -131,7 +145,7 @@ test.describe('Manage Liquidators - Submission', () => {
         }
 
         const addButton = page.getByRole('button', { name: 'Add Liquidator' })
-        expect(addButton).toBeVisible()
+        await expect(addButton).toBeVisible()
         await addButton.click()
         await fillOutNewRelationship(page, newLiquidator)
         if (!inLiquidation) {
@@ -141,11 +155,11 @@ test.describe('Manage Liquidators - Submission', () => {
           await officeParent.getByRole('button', { name: 'Done' }).click()
         }
         const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-        expect(staffNoFeeRadio).toBeVisible()
+        await expect(staffNoFeeRadio).toBeVisible()
         await staffNoFeeRadio.click()
 
         const submitBtn = page.getByRole('button', { name: 'Submit' })
-        expect(submitBtn).toBeVisible()
+        await expect(submitBtn).toBeVisible()
         const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
         await submitBtn.click()
         const request = await submitRequest
@@ -158,16 +172,16 @@ test.describe('Manage Liquidators - Submission', () => {
       await navigateToManageLiquidatorsPage(page, LiquidateType.CEASE)
       await page.waitForLoadState('networkidle')
       const existingLiquidator = page.getByRole('table').locator('tbody').getByRole('row').first()
-      expect(existingLiquidator).toBeVisible()
+      await expect(existingLiquidator).toBeVisible()
       const removeBtn = existingLiquidator.getByRole('button', { name: 'Delete' })
-      expect(removeBtn).toBeVisible()
+      await expect(removeBtn).toBeVisible()
       await removeBtn.click()
       const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-      expect(staffNoFeeRadio).toBeVisible()
+      await expect(staffNoFeeRadio).toBeVisible()
       await staffNoFeeRadio.click()
 
       const submitBtn = page.getByRole('button', { name: 'Submit' })
-      expect(submitBtn).toBeVisible()
+      await expect(submitBtn).toBeVisible()
       const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
       await submitBtn.click()
       const request = await submitRequest
@@ -193,19 +207,19 @@ test.describe('Manage Liquidators - Submission', () => {
           postalCode: 'V1N 4H8'
         }
         const existingLiquidator = page.getByRole('table').locator('tbody').getByRole('row').first()
-        expect(existingLiquidator).toBeVisible()
+        await expect(existingLiquidator).toBeVisible()
         const changeBtn = existingLiquidator.getByRole('button', { name: 'Change' })
-        expect(changeBtn).toBeVisible()
+        await expect(changeBtn).toBeVisible()
         await changeBtn.click()
         const parentLocator = page.getByTestId('party-details-form')
         await fillOutAddress(page, newAddress, 'mailing', true, parentLocator)
         await selectDone(page)
         const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-        expect(staffNoFeeRadio).toBeVisible()
+        await expect(staffNoFeeRadio).toBeVisible()
         await staffNoFeeRadio.click()
 
         const submitBtn = page.getByRole('button', { name: 'Submit' })
-        expect(submitBtn).toBeVisible()
+        await expect(submitBtn).toBeVisible()
         const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
         await submitBtn.click()
         const request = await submitRequest
@@ -224,7 +238,7 @@ test.describe('Manage Liquidators - Submission', () => {
           streetAddressAdditional: '',
           addressCity: 'newCity',
           addressCountry: 'CA',
-          addressRegion: 'AB',
+          addressRegion: 'BC',
           deliveryInstructions: '',
           postalCode: 'V1N 4H8'
         }
@@ -237,21 +251,23 @@ test.describe('Manage Liquidators - Submission', () => {
         await fillOutAddress(page, newAddress, 'mailing', true, officeParent)
         await officeParent.getByRole('button', { name: 'Done' }).click()
         const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-        expect(staffNoFeeRadio).toBeVisible()
+        await expect(staffNoFeeRadio).toBeVisible()
         await staffNoFeeRadio.click()
 
         const submitBtn = page.getByRole('button', { name: 'Submit' })
-        expect(submitBtn).toBeVisible()
+        await expect(submitBtn).toBeVisible()
         const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
         await submitBtn.click()
         const request = await submitRequest
         const requestBody = request.postDataJSON() as FilingSubmissionBody<ChangeOfLiquidators>
-        expect(requestBody.filing.changeOfLiquidators.type).toBe(LiquidateType.ADDRESS)
-        expect(requestBody.filing.changeOfLiquidators.relationships).toBeUndefined()
-        expect(requestBody.filing.changeOfLiquidators.offices?.liquidationRecordsOffice.deliveryAddress)
-          .toEqual(newAddress)
-        expect(requestBody.filing.changeOfLiquidators.offices?.liquidationRecordsOffice.mailingAddress)
-          .toEqual(newAddress)
+        const col = requestBody.filing.changeOfLiquidators
+        const office = col.offices?.liquidationRecordsOffice
+
+        expect(col.type).toBe(LiquidateType.ADDRESS)
+        expect(col.relationships).toBeUndefined()
+
+        expect(isEqualOmit(office!.deliveryAddress, newAddress, ['id'])).toBe(true)
+        expect(isEqualOmit(office!.mailingAddress, newAddress, ['id'])).toBe(true)
       })
     })
 
@@ -261,11 +277,11 @@ test.describe('Manage Liquidators - Submission', () => {
       await page.getByTestId('liquidator-info-section').getByRole('checkbox').first().check()
       await page.getByTestId('records-office-section').getByRole('checkbox').first().check()
       const staffNoFeeRadio = page.getByRole('radio', { name: 'No Fee' })
-      expect(staffNoFeeRadio).toBeVisible()
+      await expect(staffNoFeeRadio).toBeVisible()
       await staffNoFeeRadio.click()
 
       const submitBtn = page.getByRole('button', { name: 'Submit' })
-      expect(submitBtn).toBeVisible()
+      await expect(submitBtn).toBeVisible()
       const submitRequest = page.waitForRequest(`**/businesses/${identifier}/filings`, { timeout: 10000 })
       await submitBtn.click({ delay: 500 })
       const request = await submitRequest

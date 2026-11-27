@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AccordionItem } from '#ui/types'
+import { GetCorpFullDescription, CorpTypeCd } from '@bcrs-shared-components/corp-type-module'
 import { FormAddBusiness } from '#components'
 const brdModal = useBrdModals()
 const toast = useToast()
@@ -7,6 +8,7 @@ const affStore = useAffiliationsStore()
 const { t } = useNuxtApp().$i18n
 const { $authApi } = useNuxtApp()
 const ldStore = useConnectLaunchdarklyStore()
+const webUrl = getWebUrl()
 
 const props = defineProps<{
   alert?: ModalAlertProps
@@ -63,8 +65,8 @@ const authOptions = computed<AccordionItem[]>(() => {
   if (showPasscodeOption.value) {
     options.push({
       label: (businessDetails.value.isCoop || businessDetails.value.isBenefit)
-        ? t('form.manageBusiness.authOption.passcode.radioLabel.coopOrBen')
-        : t('form.manageBusiness.authOption.passcode.radioLabel.default'),
+        ? t('form.manageBusiness.authOption.passcode.radioLabel.coopOrBen', { subject: subject.value })
+        : t('form.manageBusiness.authOption.passcode.radioLabel.default', { subject: subject.value }),
       slot: 'passcode-option'
     })
   }
@@ -85,15 +87,17 @@ const authOptions = computed<AccordionItem[]>(() => {
           : isCorpOrBenOrCoop.value
             ? t('form.manageBusiness.authOption.email.radioLabel.corpOrBenOrCoop')
             : businessDetails.value.isFirm && contactEmail.value !== ''
-              ? t('form.manageBusiness.authOption.email.radioLabel.firm')
+              ? t('form.manageBusiness.authOption.email.radioLabel.firm', { subject: subject.value })
               : t('form.manageBusiness.authOption.email.radioLabel.default'),
       slot: 'email-option'
     })
   }
 
-  if (affiliatedAccounts.value.length > 0 && (ldStore.getStoredFlag(LDFlags.EnableAffiliationDelegation) || false)) {
+  // businesses still managed in COLIN can only be affiliated with passcode or email
+  if (affiliatedAccounts.value.length > 0 && isLearBusiness.value &&
+    (ldStore.getStoredFlag(LDFlags.EnableAffiliationDelegation) || false)) {
     options.push({
-      label: t('form.manageBusiness.authOption.delegation.radioLabel.default'),
+      label: t('form.manageBusiness.authOption.delegation.radioLabel.default', { subject: subject.value }),
       slot: 'delegation-option'
     })
   }
@@ -101,11 +105,59 @@ const authOptions = computed<AccordionItem[]>(() => {
   return options
 })
 
-const businessIdentifierLabel = computed(() => {
-  return businessDetails.value.isFirm ? 'form.manageBusiness.businessIdentifier.firm' : 'form.manageBusiness.businessIdentifier.default'
+const corporationTypeList = Object.values(CorporationType)
+const subject = computed(() => {
+  const legalType = props.business.legalType
+  if (corporationTypeList.includes(legalType as CorporationType)) {
+    return t('words.company')
+  }
+  return GetCorpFullDescription(props.business.legalType as CorpTypeCd) || t('words.business')
 })
 
-async function handleEmailAuthSentStateClosed () {
+// a business still managed in COLIN can be added to BRD, but is only usable as an amalgamating party.
+const showColinAlert = computed(() =>
+  !loading.value && !isLearBusiness.value && authOptions.value.length > 0
+)
+
+const alertProps = computed<ModalAlertProps | undefined>(() => {
+  if (emailSent.value) {
+    return undefined
+  }
+  // an alert from the caller (i.e. a failed SAF affiliation)
+  // takes precedence over the standing COLIN notice
+  if (props.alert) {
+    return { ...props.alert, extraTextCtx: { subject: subject.value } }
+  }
+  if (showColinAlert.value) {
+    return {
+      color: 'red',
+      icon: 'i-mdi-warning',
+      variant: 'subtle',
+      translationPath: 'form.manageBusiness.colinBusinessAlert',
+      extraTextCtx: {
+        name: props.business.name,
+        linkStart: `<a href="${webUrl.getCorporateOnlineUrl()}" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">`,
+        linkEnd: '</a>'
+      }
+    }
+  }
+  return undefined
+})
+
+const addSuccess = ref(false)
+
+function handleAddSuccess () {
+  addSuccess.value = true
+  brdModal.close()
+}
+
+async function handleModalClosed () {
+  if (addSuccess.value) {
+    // deferred so the modal provider's own after-leave reset runs first -
+    // opening synchronously here gets clobbered by that reset
+    setTimeout(() => brdModal.openAddBusinessSuccess(props.business.name, props.business.identifier), 0)
+    return
+  }
   if (formAddBusinessRef.value?.currentState === 'FormAddBusinessEmailAuthSent') {
     toast.add({ title: t('form.manageBusiness.toast.emailSent') }) // add success toast
     await affStore.loadAffiliations() // update table with new affilitations
@@ -139,7 +191,10 @@ onMounted(async () => {
     logFetchError(error, 'Error retrieving business passcode')
   }
 
-  isLearBusiness.value = await checkBusinessExistsInLear(props.business.identifier)
+  // the search result already reports a non-modernized business as not in LEAR - skip the lookup
+  isLearBusiness.value = props.business.modernized === false
+    ? false
+    : await checkBusinessExistsInLear(props.business.identifier)
 
   setTimeout(() => { // give enough time for computed options to update before removing loading state
     loading.value = false
@@ -149,17 +204,17 @@ onMounted(async () => {
 
 <template>
   <ModalBase
-    :alert="emailSent ? undefined : alert"
-    :title="emailSent ? $t('form.manageBusiness.headingRequestAccess') : $t('form.manageBusiness.heading')"
-    @modal-closed="handleEmailAuthSentStateClosed"
+    :alert="alertProps"
+    :title="emailSent ? $t('form.manageBusiness.headingRequestAccess', { subject }) : $t('form.manageBusiness.heading', { subject })"
+    @modal-closed="handleModalClosed"
   >
     <div class="flex flex-col gap-4 md:w-[700px]">
       <ul class="-mt-8 flex-col gap-2">
         <li>
-          <ConnectI18nHelper class="text-bcGovColor-darkGray" translation-path="form.manageBusiness.businessName" :name="business.name" />
+          <ConnectI18nHelper class="text-bcGovColor-darkGray" translation-path="form.manageBusiness.name" :name="business.name" />
         </li>
         <li>
-          <ConnectI18nHelper class="text-bcGovColor-darkGray" :translation-path="businessIdentifierLabel" :number="business.identifier" />
+          <ConnectI18nHelper class="text-bcGovColor-darkGray" translation-path="form.manageBusiness.number" :number="business.identifier" />
         </li>
       </ul>
 
@@ -173,7 +228,7 @@ onMounted(async () => {
       >
         <!-- company is in LEAR but doesn't have an email on file -->
         <template v-if="isLearBusiness">
-          <p>The business doesn't have an email on file. Please contact B.C. Registries by choosing one of the options in the help section below.</p>
+          <p>The {{ subject }} doesn't have an email on file. Please contact B.C. Registries by choosing one of the options in the help section below.</p>
           <!-- temporarily disabled per #29292, will be enablewhen form process is ready
           <p>{{ $t('form.manageBusiness.missingInfo.p1') }}</p> -->
 
@@ -196,7 +251,7 @@ onMounted(async () => {
         <!-- company is still managed in COLIN -->
         <template v-else>
           <p>
-            Your company is still managed through
+            Your {{ subject }} is still managed through
             <a href="https://www.corporateonline.gov.bc.ca" target="_blank" class="text-blue-500 underline">Corporate Online</a>
             <UIcon name="i-mdi-open-in-new" class="size-5 text-bcGovColor-activeBlue" /> and will be moved to the BC Business Registry soon.
           </p>
@@ -233,7 +288,9 @@ onMounted(async () => {
         :accounts="affiliatedAccounts"
         :business-details="businessDetails"
         :is-corp-or-ben-or-coop="isCorpOrBenOrCoop"
+        :subject
         @email-success="emailSent = true"
+        @add-success="handleAddSuccess"
         @retry="emailSent = false"
       />
     </div>

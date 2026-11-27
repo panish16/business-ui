@@ -64,7 +64,7 @@ defineExpose({
 
     <div class="space-y-4" data-testid="current-directors-section">
       <ManageParties
-        v-model:active-party="store.formState.activeDirector"
+        v-model:active-subject="store.formState.activeDirector"
         :loading="store.initializing"
         :empty-text="$t('label.noDirectors')"
         :section-title="`2. ${$t('label.currentDirectors')}`"
@@ -95,13 +95,14 @@ defineExpose({
     </div>
 
     <ManageShareStructure
-      v-model:active-class="store.formState.activeClass"
-      v-model:active-series="store.formState.activeSeries"
+      v-model:active-subject="store.formState.activeShareStructure"
+      model-name="activeShareStructure.value"
       data-testid="share-structure-section"
       :loading="store.initializing"
       :empty-text="$t('label.noSubjectAddedYet', { subject: $t('label.shareClasses') })"
       :section-title="`3. ${$t('label.shareStructure')}`"
       :section-description="$t('text.shareStructureMustMatchCompanysCurrentState')"
+      :collect-resolution-date="false"
     />
   </UForm>
 </template>

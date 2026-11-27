@@ -9,11 +9,17 @@ const props = defineProps<{
   partyNameProps?: {
     allowBusinessName?: boolean
     allowPreferredName?: boolean
+    requireNameChangeConfirmation?: boolean
+    requireFirstName?: boolean
   }
   partyRoleProps?: {
     allowedRoles: RoleTypeUi[]
     roleClass?: RoleClass
   }
+  effectiveDateBounds?: DateBounds
+  cessationDateBounds?: DateBounds
+  originalName?: PartyNameSchema
+  addressFormProps?: AddressFormProps
 }>()
 
 const emit = defineEmits<{
@@ -25,20 +31,64 @@ const emit = defineEmits<{
 const { alerts, attachAlerts } = useFilingAlerts(props.stateKey)
 const formTarget = 'party-details-form'
 
-type PartyDetails = Pick<PartySchema, 'name' | 'address' | 'roles'>
+type PartyDetails = Pick<PartySchema, 'name' | 'address' | 'roles' | 'email'>
 
 const model = defineModel<PartyDetails>({ required: true })
 
 const partyNameFormRef = useTemplateRef<FormPartyNameRef>('party-name-form')
 const partyRoleFormRef = useTemplateRef<FormPartyRoleRef>('party-role-form')
 const addressFormRef = useTemplateRef<AddressFormRef>('address-form')
+const partyEmailFormRef = useTemplateRef<FormPartyEmailRef>('party-email-form')
+const effectiveDateFormRef = useTemplateRef<FormEffectiveDateRef>('effective-date-form')
+const effectiveDateRangeFormRef = useTemplateRef<FormEffectiveDateRangeRef>('effective-date-range-form')
+
+function rolesWithField<K extends keyof RoleFieldConfig>(field: K) {
+  return model.value.roles.filter(role => ROLE_FIELD_CONFIG[role.roleType]?.[field])
+}
+
+const rolesWithEffectiveDate = computed(() => rolesWithField('effectiveDate'))
+const rolesWithEmail = computed(() => rolesWithField('email'))
+const rolesEligibleForCessationDate = computed(() => rolesWithField('cessationDate'))
+const rolesWithCessationDate = computed(() => rolesEligibleForCessationDate.value.filter(role => !!role.cessationDate))
+// this form never creates a cessation date from scratch - it's set by ceasing the role
+// (unchecking it) elsewhere. Checked once when the form opens, so clearing the date keeps
+// the section visible and shows its required error instead of the section disappearing
+const isCessationDateVisible = rolesWithCessationDate.value.length > 0
+
+const effectiveDateModel = computed({
+  get: (): EffectiveDateSchema => ({ dateInput: rolesWithEffectiveDate.value[0]?.appointmentDate ?? '' }),
+  set: (val: EffectiveDateSchema) => {
+    model.value.roles = model.value.roles.map(role =>
+      ROLE_FIELD_CONFIG[role.roleType]?.effectiveDate
+        ? { ...role, appointmentDate: val.dateInput }
+        : role
+    )
+  }
+})
+
+const cessationDateModel = computed({
+  get: (): EffectiveDateSchema => ({ dateInput: rolesEligibleForCessationDate.value[0]?.cessationDate ?? '' }),
+  set: (val: EffectiveDateSchema) => {
+    model.value.roles = model.value.roles.map(role =>
+      ROLE_FIELD_CONFIG[role.roleType]?.cessationDate
+        ? { ...role, cessationDate: val.dateInput || null }
+        : role
+    )
+  }
+})
 
 async function onDone() {
   // need to validate child refs to get input IDs
   const result = await Promise.allSettled([
     partyNameFormRef.value?.formRef?.validate(),
     partyRoleFormRef.value?.formRef?.validate(),
-    addressFormRef.value?.formRef?.validate()
+    addressFormRef.value?.formRef?.validate(),
+    partyEmailFormRef.value?.formRef?.validate(),
+    useEffectiveDateRange.value
+      ? effectiveDateRangeFormRef.value?.validate()
+      : isEffectiveDateVisible.value && isEffectiveDateChangeAllowed.value
+        ? effectiveDateFormRef.value?.formRef?.validate()
+        : undefined
   ])
 
   const rejections = result.filter(r => r.status === 'rejected')
@@ -61,14 +111,55 @@ async function onDone() {
 }
 
 function isAllowedAction(action: ManageAllowedAction) {
+  // newly added parties allow any edits
+  //   - the form opens with variant 'add' (adding) or 'edit' (re-opening an added row)
+  // existing parties use 'change'/'correct' and are restricted to the listed actions
   return !props.allowedActions
-    || props.allowedActions.includes(ManageAllowedAction.ADD) // allow any edits if newly added party
+    || props.variant === 'add'
+    || props.variant === 'edit'
     || props.allowedActions.includes(action)
 }
 
 const isNameChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.NAME_CHANGE))
-const isRoleChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.ROLE_CHANGE))
+// a ceased party's roles can't be changed
+const isRoleChangeAllowed = computed(() =>
+  isAllowedAction(ManageAllowedAction.ROLE_CHANGE) && !isCessationDateVisible
+)
 const isAddressChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.ADDRESS_CHANGE))
+const isEmailChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.EMAIL_CHANGE))
+const isEffectiveDateChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.EFFECTIVE_DATE_CHANGE))
+const isEffectiveDateVisible = computed(() => rolesWithEffectiveDate.value.length > 0)
+const isEffectiveDateRequired = computed(() =>
+  rolesWithEffectiveDate.value.some(
+    role => ROLE_FIELD_CONFIG[role.roleType]?.effectiveDate === RoleFieldRequirement.REQUIRED
+  )
+)
+const isCessationDateChangeAllowed = computed(() => isAllowedAction(ManageAllowedAction.CESSATION_DATE_CHANGE))
+const isCessationDateRequired = computed(() =>
+  rolesEligibleForCessationDate.value.some(
+    role => ROLE_FIELD_CONFIG[role.roleType]?.cessationDate === RoleFieldRequirement.REQUIRED
+  )
+)
+
+// once a role has both an effective date and a cessation date section, show them together
+// as a single Start Date/End Date range instead of two separately-labelled sections
+const useEffectiveDateRange = computed(() =>
+  isEffectiveDateVisible.value
+  && isCessationDateVisible
+  && isEffectiveDateChangeAllowed.value
+  && isCessationDateChangeAllowed.value
+)
+const effectiveDateRangeDescription = computed(() => {
+  const roleType = rolesEligibleForCessationDate.value[0]?.roleType
+  const roleLabel = roleType ? $t(`roleType.${roleType}`).toLowerCase() : ''
+  return $t('text.effectiveDateRangeDescription', { role: roleLabel, boldStart: '<strong>', boldEnd: '</strong>' })
+})
+const isEmailVisible = computed(() => rolesWithEmail.value.length > 0)
+const isEmailRequired = computed(() =>
+  rolesWithEmail.value.some(
+    role => ROLE_FIELD_CONFIG[role.roleType]?.email === RoleFieldRequirement.REQUIRED
+  )
+)
 
 const { targetId, messageId } = attachAlerts(formTarget, model)
 </script>
@@ -99,6 +190,7 @@ const { targetId, messageId } = attachAlerts(formTarget, model)
           ref="party-name-form"
           v-model="model.name"
           v-bind="partyNameProps"
+          :original-name
           :state="model.name"
           name="name"
         />
@@ -120,7 +212,38 @@ const { targetId, messageId } = attachAlerts(formTarget, model)
           :state="model.address"
           nested
           name="address"
+          v-bind="addressFormProps"
         />
+        <template v-if="isEmailVisible && isEmailChangeAllowed">
+          <USeparator class="padding-x-default" />
+          <FormPartyEmail
+            ref="party-email-form"
+            v-model="model.email"
+            :required="isEmailRequired"
+          />
+        </template>
+        <template v-if="useEffectiveDateRange">
+          <USeparator class="padding-x-default" />
+          <FormEffectiveDateRange
+            ref="effective-date-range-form"
+            v-model:start="effectiveDateModel"
+            v-model:end="cessationDateModel"
+            :start-required="isEffectiveDateRequired"
+            :end-required="isCessationDateRequired"
+            :start-bounds="effectiveDateBounds"
+            :end-bounds="cessationDateBounds"
+            :description="effectiveDateRangeDescription"
+          />
+        </template>
+        <template v-else-if="isEffectiveDateVisible && isEffectiveDateChangeAllowed">
+          <USeparator class="padding-x-default" />
+          <FormEffectiveDate
+            ref="effective-date-form"
+            v-model="effectiveDateModel"
+            :required="isEffectiveDateRequired"
+            :bounds="effectiveDateBounds"
+          />
+        </template>
       </template>
     </SubFormWrapper>
   </UForm>

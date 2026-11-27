@@ -8,7 +8,7 @@ import {
   assertAddress,
   getTableRowForPerson
 } from '../../test-utils'
-import { formatPartyUi, formatRelationshipApi } from '#business/app/utils/format-party'
+import { formatPartyUi, formatRelationshipApi } from '#business/app/utils/formatters/format-party'
 import {
   getFakeAddress,
   getFakePerson,
@@ -47,6 +47,10 @@ test.describe('Editing Officers', () => {
     const updatedRow = getTableRowForPerson(page, updatedRelationship.entity.familyName!)
     await expect(updatedRow).toBeVisible()
     await assertNameTableCell(page, updatedRelationship, ['ADDRESS CHANGED', 'NAME CHANGED', 'ROLES CHANGED'])
+    // the name they had before the change shows under the new one
+    const { givenName, middleInitial, familyName } = initialRelationship.entity
+    const formerName = [givenName, middleInitial, familyName].filter(Boolean).join(' ').toUpperCase()
+    await expect(updatedRow.getByRole('cell').first()).toContainText(`(Formerly ${formerName})`)
 
     // delivery should be updated
     await assertAddress(page, updatedRelationship, 1, updatedRelationship.mailingAddress!)
@@ -58,7 +62,7 @@ test.describe('Editing Officers', () => {
 
     // should be redirected to dashboard page
     await expect(page).not.toHaveURL(/.*officer-change.*/)
-    expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
+    await expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
   })
 
   test('should cancel an edit without saving changes', async ({ page }) => {
@@ -106,7 +110,7 @@ test.describe('Editing Officers', () => {
     await page.getByRole('button', { name: 'Submit' }).click()
     // should be redirected to dashboard page
     await expect(page).not.toHaveURL(/.*officer-change.*/)
-    expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
+    await expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
   })
 
   test('should be able to undo edits to original state', async ({ page }) => {

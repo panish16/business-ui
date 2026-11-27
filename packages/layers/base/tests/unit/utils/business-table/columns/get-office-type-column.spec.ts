@@ -1,7 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TableColumnIdentity } from '#components'
-import { mockGetColumnMeta, mockGetIsRowRemoved, mockGetTableBadges } from '../../../mocks/business-table-utils'
+import { mockNuxtImport } from '@nuxt/test-utils/runtime'
+
+const { mockGetColumnMeta } = vi.hoisted(() => ({ mockGetColumnMeta: vi.fn() }))
+mockNuxtImport('getColumnMeta', () => mockGetColumnMeta)
+
+const { mockGetIsRowRemoved } = vi.hoisted(() => ({ mockGetIsRowRemoved: vi.fn() }))
+mockNuxtImport('getIsRowRemoved', () => mockGetIsRowRemoved)
+
+const { mockGetTableBadges } = vi.hoisted(() => ({ mockGetTableBadges: vi.fn() }))
+mockNuxtImport('getTableBadges', () => mockGetTableBadges)
 
 describe('getOfficeTypeColumn', () => {
   beforeEach(() => {
@@ -59,9 +68,10 @@ describe('getOfficeTypeColumn', () => {
     expect(cell.props.label).toBe('Registered Office')
     expect(cell.props.badges).toEqual(mockBadges)
     expect(cell.props.class).toBe('font-bold min-w-40 max-w-40 flex flex-col gap-2')
+    expect(cell.props.labelClass).toBe('')
   })
 
-  it('cell should add "opacity-40" when row is removed', () => {
+  it('cell should add "opacity-40" to the label only (not the badges) when row is removed', () => {
     const row = {
       original: {
         new: {
@@ -77,6 +87,7 @@ describe('getOfficeTypeColumn', () => {
 
     const cell = column.cell({ row })
 
-    expect(cell.props.class).toContain('opacity-40')
+    expect(cell.props.labelClass).toBe('opacity-40')
+    expect(cell.props.class).not.toContain('opacity-40')
   })
 })

@@ -1,0 +1,123 @@
+import { cloneDeep } from 'es-toolkit'
+
+export const useAgmLocationChangeStore = defineStore('agm-location-change-store', () => {
+  const { initFiling, formatFilingPayloadApi } = useFiling()
+
+  const service = useBusinessService()
+  const businessStore = useBusinessStore()
+  const modal = useFilingModals()
+
+  const isStaff = useIsStaff()
+
+  const formState = reactive<AgmLocationChangeFormSchema>({} as AgmLocationChangeFormSchema)
+  const initialFormState = shallowRef<AgmLocationChangeFormSchema>({} as AgmLocationChangeFormSchema)
+  const initializing = ref<boolean>(false)
+  const draftFilingState = shallowRef<AgmLocationChangeDraftState>({} as AgmLocationChangeDraftState)
+
+  // initialise defaults immediately so formState is never empty
+  Object.assign(formState, getAgmLocationChangeSchema().parse({}))
+
+  async function init(businessId: string, draftId?: string) {
+    initializing.value = true
+    $reset()
+
+    const { draftFiling } = await initFiling<AgmLocationChangeFiling>(
+      businessId,
+      FilingType.AGM_LOCATION_CHANGE,
+      { draftId }
+    )
+
+    if (businessStore.business && !businessStore.isBaseCompany()) {
+      initializing.value = false
+      await modal.openFilingNotAllowedErrorModal()
+      return
+    }
+
+    if (draftFiling?.filing?.agmLocationChange) {
+      draftFilingState.value = draftFiling
+      const draft = draftFiling.filing.agmLocationChange
+      formState.year = draft.year ?? ''
+      formState.reason = draft.reason ?? ''
+      formState.agmLocation = {
+        country: draft.agmLocation.country ?? 'CA',
+        city: draft.agmLocation.city ?? '',
+        region: draft.agmLocation.region ?? ''
+      }
+    }
+
+    formState.folio = { folioNumber: draftFiling?.filing?.header?.folioNumber || businessStore.businessFolio }
+
+    await nextTick()
+    initialFormState.value = cloneDeep(formState)
+    initializing.value = false
+  }
+
+  async function submit(isSubmission: boolean) {
+    const agmLocationChangePayload: AgmLocationChangePayload = {
+      year: formState.year!,
+      reason: formState.reason!,
+      agmLocation: {
+        country: formState.agmLocation.country,
+        city: formState.agmLocation.city.trim(),
+        region: formState.agmLocation.region.trim() || null
+      }
+    }
+
+    const authorizationReceived = Boolean(formState.authorization?.isAuthorized)
+
+    const filingPayload = formatFilingPayloadApi<AgmLocationChangeFiling>(
+      businessStore.business!,
+      FilingType.AGM_LOCATION_CHANGE,
+      { agmLocationChange: agmLocationChangePayload },
+      {
+        authorizationReceived,
+        // a blank folio is filed as the business's default one
+        folioNumber: formState.folio?.folioNumber || businessStore.businessFolio || undefined
+      } as Record<string, unknown>
+    )
+
+    const header = filingPayload.filing.header as Record<string, unknown>
+
+    const completingParty = formState.authorization?.completingParty?.trim()
+
+    if (isStaff.value && completingParty) {
+      header.certifiedBy = completingParty
+    }
+
+    // remove authorizationReceived from header when saving a draft
+    if (!isSubmission) {
+      delete header.authorizationReceived
+    }
+
+    const draftId = draftFilingState.value?.filing?.header?.filingId
+    if (draftId || !isSubmission) {
+      const filingResp = await service.saveOrUpdateDraftFiling<AgmLocationChangeFiling>(
+        businessStore.businessIdentifier!,
+        filingPayload,
+        isSubmission,
+        draftId as string | number
+      )
+      draftFilingState.value = filingResp as unknown as AgmLocationChangeDraftState
+    } else {
+      await service.postFiling(businessStore.businessIdentifier!, filingPayload)
+    }
+  }
+
+  function $reset() {
+    const defaults = getAgmLocationChangeSchema().parse({})
+    Object.assign(formState, defaults)
+    initialFormState.value = cloneDeep(formState)
+    draftFilingState.value = {} as AgmLocationChangeDraftState
+  }
+
+  return {
+    formState,
+    initializing,
+    initialFormState,
+    draftFilingState,
+    isStaff,
+    init,
+    submit,
+    $reset
+  }
+})

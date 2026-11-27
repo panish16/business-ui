@@ -67,5 +67,17 @@ export default defineNuxtConfig({
       disStageDelay: '',
       playwright: process.env.playwright === 'true'
     }
+  },
+
+  typescript: {
+    tsConfig: {
+      exclude: [
+        '../../business-registry-dashboard/**',
+        '../../coops/**',
+        '../../person-roles/**',
+        '../../registry-home/**',
+        '../../../packages/layers/base/tests/**'
+      ]
+    }
   }
 })

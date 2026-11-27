@@ -66,5 +66,17 @@ export default defineNuxtConfig({
       version: `Registry Home UI v${process.env.npm_package_version || ''}`,
       playwright: process.env.playwright === 'true'
     }
+  },
+
+  typescript: {
+    tsConfig: {
+      exclude: [
+        '../../business-registry-dashboard/**',
+        '../../coops/**',
+        '../../corps/**',
+        '../../person-roles/**',
+        '../../../packages/layers/base/tests/**'
+      ]
+    }
   }
 })

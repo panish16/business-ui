@@ -3,11 +3,9 @@ import { cloneDeep } from 'es-toolkit'
 export const useTransitionStore = defineStore('transition-store', () => {
   const { tableState: tableParties } = useManageParties()
   const { tableState: tableOffices } = useManageOffices()
-  const { tableState: tableShareClasses } = useManageShareStructure()
-  const { getPartiesMergedWithRelationships } = useBusinessParty()
-  const { initFiling, createFilingPayload } = useFiling()
+  const { shareClasses: tableShareClasses } = useManageShareStructure()
+  const { initFiling, formatFilingPayloadApi, saveOrSubmitFiling } = useFiling()
 
-  const service = useBusinessService()
   const businessStore = useBusinessStore()
 
   const initializing = ref<boolean>(false)
@@ -18,20 +16,22 @@ export const useTransitionStore = defineStore('transition-store', () => {
   const initialDirectors = shallowRef<TableBusinessState<PartySchema>[]>([])
   const initialShareClasses = shallowRef<TableBusinessState<ShareClassSchema>[]>([])
 
-  const isStaff = computed(() => useConnectAccountStore().currentAccount.accountType === AccountType.STAFF)
+  const isStaff = useIsStaff()
 
   async function init(businessId: string, draftId?: string) {
     initializing.value = true
     $reset()
 
-    const { draftFiling, parties, addresses, shareClasses } = await initFiling<PRTApplication>(
+    const { draftFiling, parties, addresses, shareClasses = [] } = await initFiling<PRTApplication>(
       businessId,
       FilingType.TRANSITION,
-      undefined,
-      draftId,
-      { roleType: RoleType.DIRECTOR },
-      [OfficeType.RECORDS, OfficeType.REGISTERED],
-      true // fetch share classes
+      {
+        draftId,
+        parties: { roleType: RoleType.DIRECTOR },
+        offices: [OfficeType.RECORDS, OfficeType.REGISTERED],
+        mergeDraftOffices: false, // offices are not editable in a transition
+        shareClasses: true
+      }
     )
 
     const draft = draftFiling?.filing?.transition
@@ -46,44 +46,18 @@ export const useTransitionStore = defineStore('transition-store', () => {
         if (formState.folio) {
           formState.folio.folioNumber = draftFiling.filing.header.folioNumber
         }
-        if (formState.certify) {
-          formState.certify.legalName = draftFiling.filing.header.certifiedBy
-        }
       }
     }
 
     if (parties) {
-      const draftRelationships = draft?.relationships
-      tableParties.value = draftRelationships
-        ? getPartiesMergedWithRelationships(parties, draftRelationships)
-        : parties
+      tableParties.value = parties
     }
 
-    // offices are not editable, no need to map draft state
     if (addresses) {
       tableOffices.value = addresses
     }
 
-    if (shareClasses) {
-      const originalClasses = formatShareClassesUi(shareClasses)
-      const draftClasses = draft?.shareStructure.shareClasses
-        ? formatShareClassesUi(draft.shareStructure.shareClasses as unknown as ShareClass[])
-        : undefined
-
-      if (draftClasses) {
-        for (const shareClass of draftClasses) {
-          const classId = shareClass.new.id
-          const existingClass = classId ? originalClasses.find(c => c.new.id === classId) : undefined
-          if (existingClass) {
-            shareClass.old = existingClass.new
-          } else {
-            shareClass.old = undefined
-          }
-        }
-      }
-
-      tableShareClasses.value = draftClasses || originalClasses
-    }
+    tableShareClasses.value = shareClasses
 
     await nextTick()
     initialFormState.value = cloneDeep(formState)
@@ -104,14 +78,14 @@ export const useTransitionStore = defineStore('transition-store', () => {
       },
       hasProvisions: true,
       shareStructure: {
-        shareClasses: formatShareClassesApi(tableShareClasses.value, isSubmission)
+        shareClasses: formatShareClassesApi(tableShareClasses.value)
       },
       ...(formState.documentDelivery?.completingPartyEmail && {
         contactPoint: { email: formState.documentDelivery.completingPartyEmail }
       })
     }
 
-    const filingPayload = createFilingPayload(
+    const filingPayload = formatFilingPayloadApi(
       businessStore.business!,
       FilingType.TRANSITION,
       { transition: transitionPayload },
@@ -119,7 +93,6 @@ export const useTransitionStore = defineStore('transition-store', () => {
         ...(isStaff.value ? formatStaffPaymentApi(formState.staffPayment!) : {}),
         ...(!isStaff.value
           ? {
-            certifiedBy: formState.certify?.legalName,
             folioNumber: formState.folio?.folioNumber
           }
           : {}
@@ -127,29 +100,21 @@ export const useTransitionStore = defineStore('transition-store', () => {
       }
     )
 
-    const draftId = draftFilingState.value?.filing?.header?.filingId
-    if (draftId || !isSubmission) {
-      const filingResp = await service.saveOrUpdateDraftFiling<PRTApplication>(
-        businessStore.businessIdentifier!,
-        filingPayload,
-        isSubmission,
-        draftId as string | number
-      )
-
+    const filingResp = await saveOrSubmitFiling<PRTApplication>(businessStore.businessIdentifier!, filingPayload, {
+      isSubmission,
+      draftId: draftFilingState.value?.filing?.header?.filingId
+    })
+    if (filingResp) {
       draftFilingState.value = filingResp as unknown as TransitionDraftState
-      const urlParams = useUrlSearchParams()
-      urlParams.draft = String(filingResp.filing.header.filingId)
-    } else {
-      await service.postFiling(businessStore.businessIdentifier!, filingPayload)
     }
   }
 
   function $reset() {
+    draftFilingState.value = {} as TransitionDraftState
     const defaults = getTransitionSchema(isStaff.value).parse({})
     Object.assign(formState, defaults)
     formState.activeDirector = undefined
-    formState.activeClass = undefined
-    formState.activeSeries = undefined
+    formState.activeShareStructure = undefined
     formState.confirmDirectors = false
     formState.confirmOffices = false
 
@@ -160,6 +125,7 @@ export const useTransitionStore = defineStore('transition-store', () => {
 
   return {
     formState,
+    draftFilingState,
     initializing,
     directors: tableParties,
     offices: tableOffices,

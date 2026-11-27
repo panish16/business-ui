@@ -1,15 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mountSuspended } from '@nuxt/test-utils/runtime'
+import { mountSuspended, mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { TableColumnActions, UButton, UDropdownMenu } from '#components'
-import { mockGetIsRowEdited, mockGetIsRowRemoved } from '../../mocks/business-table-utils'
 
-const mockT = vi.fn((key: string) => key)
-vi.mock('vue-i18n', () => ({
-  useI18n: () => ({
-    t: mockT
-  })
-}))
+const { mockGetIsRowEdited } = vi.hoisted(() => ({ mockGetIsRowEdited: vi.fn() }))
+mockNuxtImport('getIsRowEdited', () => mockGetIsRowEdited)
+
+const { mockGetIsRowRemoved } = vi.hoisted(() => ({ mockGetIsRowRemoved: vi.fn() }))
+mockNuxtImport('getIsRowRemoved', () => mockGetIsRowRemoved)
 
 function createMockRow(isNew: boolean) {
   return {
@@ -25,11 +23,6 @@ function mountComponent(props: any = {}) {
     props: {
       row: createMockRow(false),
       ...props
-    },
-    global: {
-      mocks: {
-        $t: mockT
-      }
     }
   })
 }
@@ -48,7 +41,7 @@ describe('TableColumnActions', () => {
 
       expect(mainButton.exists()).toBe(true)
       expect(mainButton.props('icon')).toBe('i-mdi-pencil')
-      expect(mainButton.props('label')).toBe('label.change')
+      expect(mainButton.props('label')).toBe('Change')
     })
 
     it('should render "Undo" button when edited', async () => {
@@ -59,7 +52,7 @@ describe('TableColumnActions', () => {
 
       expect(mainButton.exists()).toBe(true)
       expect(mainButton.props('icon')).toBe('i-mdi-undo')
-      expect(mainButton.props('label')).toBe('label.undo')
+      expect(mainButton.props('label')).toBe('Undo')
     })
 
     it('should render "Undo" button when removed', async () => {
@@ -70,7 +63,7 @@ describe('TableColumnActions', () => {
 
       expect(mainButton.exists()).toBe(true)
       expect(mainButton.props('icon')).toBe('i-mdi-undo')
-      expect(mainButton.props('label')).toBe('label.undo')
+      expect(mainButton.props('label')).toBe('Undo')
     })
 
     it('should emit "init-edit" on click in default state', async () => {
@@ -133,11 +126,11 @@ describe('TableColumnActions', () => {
       mockGetIsRowRemoved.mockReturnValue(false)
       mockGetIsRowEdited.mockReturnValue(false)
       const wrapper = await mountComponent()
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       const items = dropdown.props('items')
 
       expect(items).toHaveLength(1)
-      expect(items[0].label).toBe('label.delete')
+      expect(items[0].label).toBe('Delete')
       expect(items[0].icon).toBe('i-mdi-delete')
     })
 
@@ -145,13 +138,13 @@ describe('TableColumnActions', () => {
       mockGetIsRowRemoved.mockReturnValue(false)
       mockGetIsRowEdited.mockReturnValue(true)
       const wrapper = await mountComponent()
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       const items = dropdown.props('items')
 
       expect(items).toHaveLength(2)
-      expect(items[0].label).toBe('label.change')
+      expect(items[0].label).toBe('Change')
       expect(items[0].icon).toBe('i-mdi-pencil')
-      expect(items[1].label).toBe('label.delete')
+      expect(items[1].label).toBe('Delete')
       expect(items[1].icon).toBe('i-mdi-delete')
     })
 
@@ -159,7 +152,7 @@ describe('TableColumnActions', () => {
       mockGetIsRowRemoved.mockReturnValue(false)
       mockGetIsRowEdited.mockReturnValue(false)
       const wrapper = await mountComponent()
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       const items = dropdown.props('items')
 
       items[0].onSelect()
@@ -171,7 +164,7 @@ describe('TableColumnActions', () => {
       mockGetIsRowRemoved.mockReturnValue(false)
       mockGetIsRowEdited.mockReturnValue(true)
       const wrapper = await mountComponent()
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       const items = dropdown.props('items')
 
       items[0].onSelect()
@@ -203,11 +196,25 @@ describe('TableColumnActions', () => {
       })
 
       expect(wrapper.findComponent(UButton).exists()).toBe(true)
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.edit')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Edit')
 
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       expect(dropdown.exists()).toBe(true)
       expect(dropdown.props('items')).toHaveLength(1)
+    })
+
+    it('should not offer Remove on a NEW row when hideRemove is set', async () => {
+      mockGetIsRowRemoved.mockReturnValue(false)
+      mockGetIsRowEdited.mockReturnValue(false)
+
+      const wrapper = await mountComponent({
+        allowedActions: [ManageAllowedAction.ADDRESS_CHANGE],
+        row: createMockRow(true),
+        hideRemove: true
+      })
+
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Edit')
+      expect(wrapper.findComponent(UDropdownMenu).exists()).toBe(false)
     })
 
     it('should only show Delete if only REMOVE action is allowed on existing row', async () => {
@@ -220,7 +227,7 @@ describe('TableColumnActions', () => {
       })
 
       const mainButton = wrapper.findComponent(UButton)
-      expect(mainButton.props('label')).toBe('label.delete')
+      expect(mainButton.props('label')).toBe('Delete')
       expect(wrapper.findComponent(UDropdownMenu as any).exists()).toBe(false)
     })
 
@@ -231,9 +238,9 @@ describe('TableColumnActions', () => {
       const wrapper = await mountComponent({ allowedActions: undefined })
 
       const mainButton = wrapper.findComponent(UButton)
-      expect(mainButton.props('label')).toBe('label.change')
+      expect(mainButton.props('label')).toBe('Change')
 
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       expect(dropdown.exists()).toBe(true)
       expect(dropdown.props('items')).toHaveLength(1)
     })
@@ -244,7 +251,7 @@ describe('TableColumnActions', () => {
         row: createMockRow(false)
       })
 
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.change')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Change')
       expect(wrapper.findComponent(UDropdownMenu as any).exists()).toBe(false)
     })
 
@@ -254,7 +261,7 @@ describe('TableColumnActions', () => {
         row: createMockRow(false)
       })
 
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.change')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Change')
       expect(wrapper.findComponent(UDropdownMenu as any).exists()).toBe(false)
     })
 
@@ -264,7 +271,7 @@ describe('TableColumnActions', () => {
         row: createMockRow(false)
       })
 
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.change')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Change')
       expect(wrapper.findComponent(UDropdownMenu as any).exists()).toBe(false)
     })
 
@@ -278,7 +285,7 @@ describe('TableColumnActions', () => {
       })
 
       const mainButton = wrapper.findComponent(UButton)
-      expect(mainButton.props('label')).toBe('label.undo')
+      expect(mainButton.props('label')).toBe('Undo')
     })
 
     it('should keep Undo as main action and push Delete to dropdown when edited', async () => {
@@ -290,11 +297,11 @@ describe('TableColumnActions', () => {
         row: createMockRow(false)
       })
 
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.undo')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Undo')
 
-      const dropdown = wrapper.findComponent(UDropdownMenu as any)
+      const dropdown = wrapper.findComponent(UDropdownMenu) as any
       expect(dropdown.exists()).toBe(true)
-      expect(dropdown.props('items')[0].label).toBe('label.delete')
+      expect(dropdown.props('items')[0].label).toBe('Delete')
     })
 
     it('should show Undo as main action for a NEW row that has been edited', async () => {
@@ -306,7 +313,7 @@ describe('TableColumnActions', () => {
         row: createMockRow(true)
       })
 
-      expect(wrapper.findComponent(UButton).props('label')).toBe('label.undo')
+      expect(wrapper.findComponent(UButton).props('label')).toBe('Undo')
     })
   })
 })

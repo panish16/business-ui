@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import type { BusinessRelationship } from '#business/app/interfaces/business-relationship'
 import type { OrgPerson } from '#business/app/interfaces/org-person'
 import { fillOutFolio, fillOutNewRelationship } from '#business/tests/e2e/test-utils'
-import { formatPartyUi, formatRelationshipApi } from '#business/app/utils/format-party'
+import { formatPartyUi, formatRelationshipApi } from '#business/app/utils/formatters/format-party'
 import { getFilingMock } from '#test-mocks'
 import {
   setupOfficerChangePage,
@@ -49,6 +49,13 @@ test.describe('Draft Officers', () => {
           status: 200,
           json: draftFilingResponse
         })
+      })
+    // resuming a draft fetches its rebase changes report - a 404 (rebase not enabled) loads the draft as saved,
+    // anything else unmocked fails the check and shows the "Unable to load draft" modal
+    await page.route(
+      `*/**/businesses/${identifier}/filings/${filingId}/changes`,
+      async (route) => {
+        await route.fulfill({ status: 404, json: {} })
       })
 
     // edit existing officer
@@ -123,6 +130,6 @@ test.describe('Draft Officers', () => {
 
     // should be redirected to dashboard page
     await expect(page).not.toHaveURL(/.*officer-change.*/)
-    expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
+    await expect(page.getByText('Redirected to playwright mocked business dashboard')).toBeVisible()
   })
 })

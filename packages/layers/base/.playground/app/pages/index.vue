@@ -32,84 +32,153 @@ const componentExamples: DropdownMenuItem[] = [
     to: localePath('/examples/components/BusinessLedger/Wrapper')
   },
   {
-    label: 'ManageOffices',
+    label: 'Manager Components',
+    description: 'Stateful sections managing form controls, data tables, and row edits',
     children: [
       {
-        to: localePath('/examples/components/ManageOffices'),
-        label: 'Default'
-      },
-      {
-        label: 'Allowed Actions',
+        label: 'ManageAmalgamation',
         children: [
           {
-            label: 'Add',
-            to: localePath('/examples/components/ManageOffices/allowed-actions/add')
-          },
-          {
-            label: 'Edits',
-            to: localePath('/examples/components/ManageOffices/allowed-actions/edits')
-          },
-          {
-            label: 'Remove',
-            to: localePath('/examples/components/ManageOffices/allowed-actions/remove')
-          },
-          {
-            label: 'None',
-            to: localePath('/examples/components/ManageOffices/allowed-actions/none')
+            to: localePath('/examples/components/Manage/Amalgamation/Correct'),
+            label: 'Correct'
           }
         ]
-      }
-    ]
-  },
-  {
-    label: 'ManageParties',
-    children: [
-      {
-        to: localePath('/examples/components/ManageParties'),
-        label: 'Default'
       },
       {
-        label: 'Allowed Actions',
+        label: 'ManageCourtOrders',
         children: [
           {
-            label: 'Add',
-            to: localePath('/examples/components/ManageParties/allowed-actions/add')
-          },
-          {
-            label: 'Remove',
-            to: localePath('/examples/components/ManageParties/allowed-actions/remove')
-          },
-          {
-            label: 'Edits',
-            to: localePath('/examples/components/ManageParties/allowed-actions/edits')
-          },
-          {
-            label: 'Mixed',
-            to: localePath('/examples/components/ManageParties/allowed-actions/mixed')
+            to: localePath('/examples/components/Manage/CourtOrders'),
+            label: 'Default'
           }
         ]
-      }
-    ]
-  },
-  {
-    label: 'ManageShareStructure',
-    children: [
-      {
-        to: localePath('/examples/components/ManageShareStructure'),
-        label: 'Default'
-      }
-    ]
-  },
-  {
-    label: 'ManageCompanyName',
-    children: [
-      {
-        to: localePath('/examples/components/ManageCompanyName'),
-        label: 'Readonly'
       },
       {
-        to: localePath('/examples/components/ManageCompanyName/editable'),
-        label: 'Editable'
+        label: 'ManageNameTranslations',
+        children: [
+          {
+            to: localePath('/examples/components/Manage/NameTranslations'),
+            label: 'Default'
+          },
+          {
+            to: localePath('/examples/components/Manage/NameTranslations/correct'),
+            label: 'Correct'
+          },
+          {
+            to: localePath('/examples/components/Manage/NameTranslations/readonly'),
+            label: 'Readonly'
+          }
+        ]
+      },
+      {
+        label: 'ManageOffices',
+        children: [
+          {
+            to: localePath('/examples/components/Manage/Offices'),
+            label: 'Default'
+          },
+          {
+            label: 'Allowed Actions',
+            children: [
+              {
+                label: 'Add',
+                to: localePath('/examples/components/Manage/Offices/allowed-actions/add')
+              },
+              {
+                label: 'Edits',
+                to: localePath('/examples/components/Manage/Offices/allowed-actions/edits')
+              },
+              {
+                label: 'Remove',
+                to: localePath('/examples/components/Manage/Offices/allowed-actions/remove')
+              },
+              {
+                label: 'None',
+                to: localePath('/examples/components/Manage/Offices/allowed-actions/none')
+              }
+            ]
+          },
+          {
+            to: localePath('/examples/components/Manage/Offices/bc-canada-only'),
+            label: 'BC/Canada Only'
+          },
+          {
+            to: localePath('/examples/components/Manage/Offices/live-data'),
+            label: 'Live Data'
+          }
+        ]
+      },
+      {
+        label: 'ManageParties',
+        children: [
+          {
+            to: localePath('/examples/components/Manage/Parties'),
+            label: 'Default'
+          },
+          {
+            to: localePath('/examples/components/Manage/Parties/with-configurable-fields'),
+            label: 'With Configurable Fields'
+          },
+          {
+            to: localePath('/examples/components/Manage/Parties/with-ceased-director'),
+            label: 'With Ceased Director'
+          },
+          {
+            to: localePath('/examples/components/Manage/Parties/director-change'),
+            label: 'Director Change'
+          },
+          {
+            to: localePath('/examples/components/Manage/Parties/liquidator'),
+            label: 'Liquidator'
+          },
+          {
+            label: 'Allowed Actions',
+            children: [
+              {
+                label: 'Add',
+                to: localePath('/examples/components/Manage/Parties/allowed-actions/add')
+              },
+              {
+                label: 'Remove',
+                to: localePath('/examples/components/Manage/Parties/allowed-actions/remove')
+              },
+              {
+                label: 'Edits',
+                to: localePath('/examples/components/Manage/Parties/allowed-actions/edits')
+              },
+              {
+                label: 'Mixed',
+                to: localePath('/examples/components/Manage/Parties/allowed-actions/mixed')
+              }
+            ]
+          }
+        ]
+      },
+      {
+        label: 'ManageShareStructure',
+        children: [
+          {
+            to: localePath('/examples/components/Manage/ShareStructure'),
+            label: 'Default'
+          },
+          {
+            to: localePath('/examples/components/Manage/ShareStructure/currency-other'),
+            label: 'Currency Other'
+          },
+          {
+            to: localePath('/examples/components/Manage/ShareStructure/real-data'),
+            label: 'Real Data'
+          }
+        ]
+      },
+      {
+        label: 'ManageYourCompany',
+        children: [
+          {
+            to: localePath('/examples/components/Manage/YourCompany'),
+            label: 'Correct'
+          }
+        ]
       }
     ]
   },
@@ -118,52 +187,108 @@ const componentExamples: DropdownMenuItem[] = [
     to: localePath('/examples/components/Modal/StaffPay')
   },
   {
-    label: 'FormDetail',
-    to: localePath('/examples/components/Form/Detail')
-  },
-  {
-    label: 'FormDocumentDelivery',
-    to: localePath('/examples/components/Form/DocumentDelivery')
-  },
-  {
-    label: 'FormDocumentId',
-    to: localePath('/examples/components/Form/DocumentId')
-  },
-  {
-    label: 'FormDocumentUpload',
-    to: localePath('/examples/components/Form/DocumentUpload')
-  },
-  {
-    label: 'FormDocumentUpload: Invalid',
-    to: localePath('/examples/components/Form/DocumentUpload/invalid')
-  },
-  {
-    label: 'FormBusinessName',
-    to: localePath('/examples/components/Form/BusinessName')
-  },
-  {
-    label: 'FormCertify',
-    to: localePath('/examples/components/Form/Certify/default')
-  },
-  {
-    label: 'FormConfirmAuthorization',
-    to: localePath('/examples/components/Form/ConfirmAuthorization/default')
-  },
-  {
-    label: 'FormNameRequestNumber',
-    to: localePath('/examples/components/Form/NameRequest/Number')
-  },
-  {
-    label: 'FormNameTranslation',
-    to: localePath('/examples/components/Form/NameTranslation')
-  },
-  {
-    label: 'FormPreExistingCompanyRevisions',
-    to: localePath('/examples/components/Form/PreExistingCompanyProvisions')
+    label: 'Form Components',
+    description: 'Forms, form sections and form sub sections',
+    children: [
+      {
+        label: 'FormAmalgamation',
+        children: [
+          { label: 'Correct', to: localePath('/examples/components/Form/Amalgamation/Correct') },
+          { label: 'Correct Statement', to: localePath('/examples/components/Form/Amalgamation/Correct/Statement') }
+        ]
+      },
+      {
+        label: 'FormBusinessName',
+        to: localePath('/examples/components/Form/BusinessName')
+      },
+      {
+        label: 'FormCertify',
+        to: localePath('/examples/components/Form/Certify/default')
+      },
+      {
+        label: 'FormConfirmAuthorization',
+        to: localePath('/examples/components/Form/ConfirmAuthorization/default')
+      },
+      {
+        label: 'FormConfirmCompletingParty',
+        to: localePath('/examples/components/Form/ConfirmCompletingParty')
+      },
+      {
+        label: 'FormCourtOrderPoa',
+        children: [
+          { label: 'Default', to: localePath('/examples/components/Form/CourtOrderPoa/default') },
+          { label: 'Full', to: localePath('/examples/components/Form/CourtOrderPoa/full') }
+        ]
+      },
+      {
+        label: 'FormDetail',
+        to: localePath('/examples/components/Form/Detail')
+      },
+      {
+        label: 'FormDocumentDelivery',
+        to: localePath('/examples/components/Form/DocumentDelivery')
+      },
+      {
+        label: 'FormDocumentId',
+        to: localePath('/examples/components/Form/DocumentId')
+      },
+      {
+        label: 'FormDocumentUpload',
+        children: [
+          {
+            label: 'Default',
+            to: localePath('/examples/components/Form/DocumentUpload')
+          },
+          {
+            label: 'Invalid',
+            to: localePath('/examples/components/Form/DocumentUpload/invalid')
+          }
+        ]
+      },
+      {
+        label: 'FormEffectiveDate',
+        to: localePath('/examples/components/Form/EffectiveDate')
+      },
+      {
+        label: 'FormEffectiveDateRange',
+        to: localePath('/examples/components/Form/EffectiveDate/Range')
+      },
+      {
+        label: 'FormFolio',
+        children: [
+          { label: 'Default', to: localePath('/examples/components/Form/Folio/default') },
+          { label: 'With Default Folio', to: localePath('/examples/components/Form/Folio/with-default') }
+        ]
+      },
+      {
+        label: 'FormForeignJurisdiction',
+        to: localePath('/examples/components/Form/ForeignJurisdiction')
+      },
+      {
+        label: 'FormReviewWrapper',
+        to: localePath('/examples/components/Form/ReviewWrapper')
+      },
+      {
+        label: 'FormNameRequestNumber',
+        to: localePath('/examples/components/Form/NameRequest/Number')
+      },
+      {
+        label: 'FormNameTranslation',
+        to: localePath('/examples/components/Form/NameTranslation')
+      },
+      {
+        label: 'FormPreExistingCompanyRevisions',
+        to: localePath('/examples/components/Form/PreExistingCompanyProvisions')
+      }
+    ]
   },
   {
     label: 'Table Examples',
     children: [
+      {
+        label: 'TableAmalgamation',
+        to: localePath('/examples/components/Table/Amalgamation')
+      },
       {
         label: 'TableBusiness',
         to: localePath('/examples/components/Table/Business')

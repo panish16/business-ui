@@ -76,8 +76,7 @@ export const useBusinessLedger = (filing: BusinessLedgerItem) => {
       && regionShortCode.toUpperCase() !== 'FEDERAL'
       && (foreignJurisdictionCountry === 'CA' || foreignJurisdictionCountry === 'US')
     ) {
-      const regionName = getRegionName(foreignJurisdictionCountry, regionShortCode)
-      return regionName + ', ' + countryName
+      return getRegionName(foreignJurisdictionCountry, regionShortCode)
     } else {
       return countryName
     }
@@ -187,10 +186,20 @@ export const useBusinessLedger = (filing: BusinessLedgerItem) => {
   }
 
   const comments = computed(() => ledgerItem.value.comments || [])
+  // comments that are part of the filing
+  const filingDetailComments = computed(() =>
+    comments.value.filter(comment => comment.commentType === CommentType.FILING)
+  )
+  // comments added by staff
+  const detailComments = computed(() =>
+    comments.value.filter(comment => comment.commentType !== CommentType.FILING)
+  )
   const documents = computed(() => ledgerItem.value.documents || [])
 
   return {
     comments,
+    detailComments,
+    filingDetailComments,
     documents,
     foreignJurisdiction,
     isChangeOfOfficers,

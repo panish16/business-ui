@@ -16,6 +16,10 @@ vi.mock('~/utils/business-table/columns/get-effective-dates-column', () => ({
   getEffectiveDatesColumn: vi.fn(() => ({ id: 'effectiveDates' }))
 }))
 
+vi.mock('~/utils/business-table/columns/get-email-column', () => ({
+  getEmailColumn: vi.fn(() => ({ id: 'email' }))
+}))
+
 vi.mock('~/utils/business-table/columns/get-actions-column', () => ({
   getActionsColumn: vi.fn(() => ({ id: 'actions' }))
 }))
@@ -46,6 +50,19 @@ describe('getPartyTableColumns', () => {
     ])
   })
 
+  it('should not show the former name by default', () => {
+    getPartyTableColumns()
+
+    expect(getPartyNameColumn).toHaveBeenCalledWith('first', undefined, true)
+  })
+
+  it('should pass a showFormerName opt-out through to the name column', () => {
+    const badges = { [ActionType.NAME_CHANGED]: 'Corrected' }
+    getPartyTableColumns(['name'], badges, false)
+
+    expect(getPartyNameColumn).toHaveBeenCalledWith('first', badges, false)
+  })
+
   it('should return custom column config and ordering', () => {
     const columns = getPartyTableColumns([
       'name',
@@ -54,11 +71,12 @@ describe('getPartyTableColumns', () => {
       'delivery',
       'mailing',
       'delivery',
+      'email',
       'actions',
       'actions'
     ])
 
-    expect(columns).toHaveLength(8)
+    expect(columns).toHaveLength(9)
     expect(columns.map(c => c.id)).toEqual([
       'name',
       'effectiveDates',
@@ -66,6 +84,7 @@ describe('getPartyTableColumns', () => {
       'deliveryAddress',
       'mailingAddress',
       'deliveryAddress',
+      'email',
       'actions',
       'actions'
     ])

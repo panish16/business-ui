@@ -1,0 +1,88 @@
+<script setup lang="ts">
+import type { FormErrorEvent } from '@nuxt/ui'
+import { z } from 'zod'
+
+const store = useReviewImportedDataStore()
+const businessStore = useBusinessStore()
+const staffPayFormRef = useTemplateRef<StaffPaymentFieldsetRef>('staff-pay-ref')
+defineProps<{
+  viewOnly?: boolean
+}>()
+
+// the review table leaves out the empty rows seeded for offices the business has no record of
+const { tableState: reviewOffices } = useManageOffices('review-offices')
+watchEffect(() => {
+  reviewOffices.value = store.offices.filter(office => office.old !== undefined || office.new.actions.length > 0)
+})
+
+function onError(event: FormErrorEvent) {
+  const firstError = event?.errors?.[0]
+
+  if (firstError?.name === 'staffPayment.option') {
+    staffPayFormRef.value?.setFocusOnError()
+  } else {
+    onFormSubmitError(event)
+  }
+}
+</script>
+
+<template>
+  <UForm
+    ref="review-imported-data-step-2"
+    :state="store.formState"
+    :schema="z.any()"
+    novalidate
+    class="space-y-6 sm:space-y-10"
+    @error="onError"
+  >
+    <FormReviewWrapper :view-only="viewOnly">
+      <!-- only the sections the user changed are reviewed - they are the only ones sent -->
+      <section class="space-y-6" data-testid="review-section">
+        <ManageOffices
+          v-if="store.hasOfficeChanges"
+          state-key="review-offices"
+          variant="readonly"
+          data-testid="review-office-addresses-section"
+          :loading="store.initializing"
+          :empty-text="$t('label.noOffices')"
+          :table-title="$t('label.companyInformation')"
+        />
+
+        <ManageParties
+          v-if="store.hasDirectorChanges"
+          variant="readonly"
+          data-testid="review-current-directors-section"
+          :loading="store.initializing"
+          :empty-text="$t('label.noDirectors')"
+          :table-title="$t('label.currentDirectors')"
+          :columns-to-display="['name', 'mailing', 'delivery', 'effectiveDates']"
+        />
+      </section>
+
+      <template #submission-fields>
+        <!-- the review tables above carry no number, so the sections below don't either (per the UXA mocks) -->
+        <FormFolio
+          v-if="!store.isStaff && store.formState.folio"
+          v-model="store.formState.folio"
+          data-testid="folio-section"
+          name="folio"
+        />
+
+        <FormCertify
+          v-if="!store.isStaff && store.formState.certify"
+          v-model="store.formState.certify"
+          data-testid="certify-section"
+          :entity-type="getCorpFullDescription(businessStore.business?.legalType, businessStore.business?.legalType)"
+          name="certify"
+        />
+
+        <StaffPaymentFieldset
+          v-if="store.isStaff && store.formState.staffPayment"
+          ref="staff-pay-ref"
+          v-model="store.formState.staffPayment"
+          :initializing="store.initializing"
+        />
+      </template>
+    </FormReviewWrapper>
+  </UForm>
+</template>

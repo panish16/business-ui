@@ -38,8 +38,9 @@ test.describe('Form Validation', () => {
 
       const countrySelect = page.getByTestId('delivery-address-input-country')
       await countrySelect.scrollIntoViewIfNeeded()
-      await page.getByTestId('delivery-address-input-country').focus()
-      await page.getByTestId('delivery-address-input-country').click()
+      await countrySelect.focus()
+      await countrySelect.click()
+      await countrySelect.fill('')
       const optionsList = page.getByRole('listbox') // listbox is a teleport on the page body
       await optionsList.scrollIntoViewIfNeeded()
       await expect(optionsList).toBeVisible()
@@ -55,11 +56,16 @@ test.describe('Form Validation', () => {
 
   test.describe('Folio Form', () => {
     test.beforeEach(async ({ page }) => {
+      // businesses with a folio on file get a choice first; pick a number for this transaction only
+      const transactionOption = page.getByTestId('folio-option').getByRole('radio').nth(1)
+      if (await transactionOption.count()) {
+        await transactionOption.click()
+      }
       await expect(page.getByTestId('folio-input')).toBeVisible()
     })
 
     test('should display a max length error', async ({ page }) => {
-      const folioInput = page.getByLabel('Folio or Reference Number (Optional)')
+      const folioInput = page.getByTestId('folio-input')
       await folioInput.fill('a'.repeat(51))
       // click outside to trigger validation
       await page.getByText('Folio or Reference Number').first().click()

@@ -393,6 +393,8 @@ async function redirect (item: Business) {
     }
   } else if (isSocieties(item)) {
     affNav.goToSocieties()
+  } else if (isColinManaged(item)) { // no dashboard exists for a business not loaded in LEAR
+    affNav.goToCorpOnline()
   } else {
     await affStore.removeAcceptedAffiliationInvitations(item)
     affNav.goToDashboard(item.businessIdentifier)
@@ -463,6 +465,12 @@ const showAffiliationInvitationCancelRequestButton = (item: Business): boolean =
     invite.type === AffiliationInvitationType.EMAIL
 }
 
+// Only a real, established business has accounts affiliated to it -- a name request or a draft
+// filing has nothing to show on the View Access screen.
+const showViewAccess = (item: Business): boolean => {
+  return !!item.businessIdentifier && !isNameRequest(item) && !isTemporaryBusiness(item)
+}
+
 const moreActionsDropdownOptions = computed<DropdownItem[][]>(() => {
   const options = []
   if (showAffiliationInvitationNewRequestButton(props.item)) {
@@ -511,6 +519,14 @@ const moreActionsDropdownOptions = computed<DropdownItem[][]>(() => {
       icon: 'i-mdi-checkbox-multiple-blank-outline'
     })
   }
+
+  if (showViewAccess(props.item)) {
+    options.push({
+      label: t('labels.viewAccess'),
+      click: () => affNav.goToViewAccess(props.item.businessIdentifier),
+      icon: 'i-mdi-account-multiple-outline'
+    })
+  }
   return [options]
 })
 
@@ -530,6 +546,7 @@ const moreActionsDropdownOptions = computed<DropdownItem[][]>(() => {
           :label="getPrimaryActionLabel(item)"
           class="w-44 px-4 transition-all duration-200 hover:opacity-95 hover:brightness-125"
           :icon="affNav.isOpenExternal(item) ? 'i-mdi-open-in-new' : ''"
+          trailing
           :loading="isButtonActionProcessing"
           @click="primaryAction(item)"
         />

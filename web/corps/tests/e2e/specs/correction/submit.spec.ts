@@ -1,6 +1,11 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { setupCorrectionPage, navigateToCorrectionPage } from '../../test-utils'
+import {
+  setupCorrectionPage,
+  navigateToCorrectionPage,
+  fillCompletingPartyEmail,
+  goToCorrectionReviewStep
+} from '../../test-utils'
 import { CRCTN, CRCTN_NO_FEE } from '~~/tests/mocks'
 
 const identifier = 'BC1234567'
@@ -10,13 +15,20 @@ async function makeDirectorChange(page: Page) {
   const directors = page.getByTestId('current-directors-section').locator('tbody')
   const rowToEdit = directors.locator('tr').filter({ hasText: 'TESTER TESTING' })
   const streetInput = directors.getByTestId('mailing-address-input-streetAdditional')
+  const sameAsMailingCheckbox = directors.getByRole('checkbox', { name: 'Delivery Address same as Mailing Address' })
   await rowToEdit.getByRole('button', { name: 'Correct' }).click()
   await expect(streetInput).toBeVisible()
-  // Use toPass for CI resilience — retries the fill+Done+verify cycle if the form
+  await streetInput.fill('Corrected Unit 1A')
+  // Editing the mailing address debounce-resets "same as mailing" for 100ms by design
+  // (see Form/Address/index.vue) — wait it out, then re-confirm delivery matches mailing.
+  await page.waitForTimeout(200)
+  // Use toPass for CI resilience — retries the check+Done+verify cycle if the form
   // is slow to validate/close on resource-constrained environments
   await expect(async () => {
     if (await streetInput.isVisible()) {
-      await streetInput.fill('Corrected Unit 1A')
+      if (!(await sameAsMailingCheckbox.isChecked())) {
+        await sameAsMailingCheckbox.check({ force: true })
+      }
       await directors.getByRole('button', { name: 'Done' }).click()
     }
     await expect(streetInput).not.toBeVisible()
@@ -26,16 +38,6 @@ async function makeDirectorChange(page: Page) {
 async function fillCorrectionComment(page: Page, comment: string) {
   const commentSection = page.getByTestId('correction-comment-section')
   await commentSection.locator('textarea').fill(comment)
-}
-
-async function goToReview(page: Page) {
-  await page.getByRole('button', { name: 'Review and Confirm' }).click()
-  // Wait for step transition to complete
-  await expect(page.getByTestId('review-section')).toBeVisible({ timeout: 10000 })
-}
-
-async function fillCompletingParty(page: Page) {
-  await page.getByTestId('completing-party-email-input').fill('correction-test@example.com')
 }
 
 async function fillConfirmAuthorization(page: Page) {
@@ -58,7 +60,7 @@ test.describe('Correction - Filing Submit', () => {
       await makeDirectorChange(page)
 
       // Navigate to step 2
-      await goToReview(page)
+      await goToCorrectionReviewStep(page)
 
       // Review: directors should be visible
       await expect(page.getByTestId('review-current-directors-section')).toBeVisible()
@@ -70,7 +72,7 @@ test.describe('Correction - Filing Submit', () => {
       await expect(page.getByTestId('correction-comment-section')).toBeVisible()
 
       // Fill completing party email
-      await fillCompletingParty(page)
+      await fillCompletingPartyEmail(page, 'correction-test@example.com')
 
       // Confirm authorization is required for corp legal types
       await fillConfirmAuthorization(page)
@@ -96,18 +98,10 @@ test.describe('Correction - Filing Submit', () => {
       expect(correction.comment).toBe('Correcting director address from original incorporation')
       expect(correction.contactPoint).toHaveProperty('email', 'correction-test@example.com')
 
-      // Verify relationships are included (party data formatted as relationships)
-      expect(correction.relationships).toBeDefined()
-      expect(correction.relationships.length).toBeGreaterThan(0)
-
-      // Verify offices are included
-      expect(correction.offices).toBeDefined()
-      expect(correction.offices).toHaveProperty('registeredOffice')
-      expect(correction.offices).toHaveProperty('recordsOffice')
-
-      // Verify share structure is included
-      expect(correction.shareStructure).toBeDefined()
-      expect(correction.shareStructure.shareClasses).toBeDefined()
+      // Verify only the corrected party is sent as a relationship (unchanged parties are excluded)
+      expect(correction.relationships).toHaveLength(1)
+      expect(correction.relationships[0].entity).toMatchObject({ givenName: 'Tester', familyName: 'Testing' })
+      expect(correction.relationships[0].actions.length).toBeGreaterThan(0)
 
       // Should redirect to dashboard
       await page.waitForURL(
@@ -198,7 +192,7 @@ test.describe('Correction - Filing Submit', () => {
       await makeDirectorChange(page)
 
       // Navigate to step 2
-      await goToReview(page)
+      await goToCorrectionReviewStep(page)
 
       // Review: directors should be visible
       await expect(page.getByTestId('review-current-directors-section')).toBeVisible()
@@ -222,7 +216,7 @@ test.describe('Correction - Filing Submit', () => {
       await fillCorrectionComment(page, 'Client correction: fixing director address')
 
       // Fill document delivery email
-      await fillCompletingParty(page)
+      await fillCompletingPartyEmail(page, 'correction-test@example.com')
 
       // Fill completing party name fields
       await page.getByTestId('completing-party-first-name').locator('input').fill('Test')
@@ -284,6 +278,37 @@ test.describe('Correction - Filing Submit', () => {
     })
   })
 
+  test.describe('Custodians', () => {
+    test('should only allow correcting an existing custodian', async ({ page }) => {
+      await setupCorrectionPage(page, identifier, filingId, CRCTN_NO_FEE, 'STAFF', 'STAFF', {
+        partyRoleTypes: ['Director', 'Director', 'Custodian'],
+        correctedFiling: { filingType: 'dissolution', data: { dissolutionType: 'voluntary' } }
+      })
+      await navigateToCorrectionPage(page, identifier, filingId)
+      await page.waitForLoadState('networkidle')
+      await expect(page.getByText(/loading/i)).not.toBeVisible({ timeout: 15000 })
+
+      const custodians = page.getByTestId('custodians-section')
+      await expect(custodians).toContainText('MIHAI DINU TEST')
+      // adding or removing a custodian is not part of a custodian correction
+      await expect(custodians.getByRole('button', { name: 'Add Custodian' })).not.toBeVisible()
+
+      const row = custodians.locator('tbody tr').first()
+      await expect(row.getByRole('button', { name: 'Correct' })).toBeVisible()
+      // no actions dropdown (remove) next to the correct button
+      await expect(row.getByRole('button')).toHaveCount(1)
+
+      await row.getByRole('button', { name: 'Correct' }).click()
+      const form = custodians.getByTestId('party-details-form')
+      await expect(form).toBeVisible()
+      // name, address and email can be corrected
+      await expect(form.getByTestId('first-name-input')).toBeVisible()
+      await expect(form.getByTestId('mailing-address-input-street')).toBeVisible()
+      await expect(form.getByTestId('party-email-input')).toBeVisible()
+      await expect(form.getByRole('button', { name: 'Delete' })).not.toBeVisible()
+    })
+  })
+
   test.describe('Step navigation', () => {
     test('should navigate back from step 2 to step 1', async ({ page }) => {
       await setupCorrectionPage(page, identifier, filingId, CRCTN_NO_FEE, 'STAFF', 'STAFF')
@@ -293,7 +318,7 @@ test.describe('Correction - Filing Submit', () => {
 
       // Make a change and navigate to step 2
       await makeDirectorChange(page)
-      await goToReview(page)
+      await goToCorrectionReviewStep(page)
 
       // Verify we are on step 2
       await expect(page.getByTestId('review-section')).toBeVisible()
@@ -319,7 +344,7 @@ test.describe('Correction - Filing Submit', () => {
 
       // Make a change and navigate to step 2
       await makeDirectorChange(page)
-      await goToReview(page)
+      await goToCorrectionReviewStep(page)
 
       // Document delivery section should be visible on step 2
       await expect(page.getByTestId('document-delivery-section')).toBeVisible()
@@ -335,11 +360,18 @@ test.describe('Correction - Filing Submit', () => {
       const offices = page.getByTestId('office-addresses-section').locator('tbody')
       const rowToEdit = offices.locator('tr').first()
       const officeStreetInput = offices.getByTestId('mailing-address-input-streetAdditional')
+      const sameAsMailingCheckbox = offices.getByRole('checkbox', { name: 'Delivery Address same as Mailing Address' })
       await rowToEdit.getByRole('button', { name: 'Correct' }).click()
       await expect(officeStreetInput).toBeVisible()
+      await officeStreetInput.fill('Suite 200')
+      // Editing the mailing address debounce-resets "same as mailing" for 100ms by design
+      // (see Form/Address/index.vue) — wait it out, then re-confirm delivery matches mailing.
+      await page.waitForTimeout(200)
       await expect(async () => {
         if (await officeStreetInput.isVisible()) {
-          await officeStreetInput.fill('Suite 200')
+          if (!(await sameAsMailingCheckbox.isChecked())) {
+            await sameAsMailingCheckbox.check({ force: true })
+          }
           await offices.getByRole('button', { name: 'Done' }).click()
         }
         await expect(officeStreetInput).not.toBeVisible()

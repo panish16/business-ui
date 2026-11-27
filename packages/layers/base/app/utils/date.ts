@@ -8,7 +8,7 @@ import type { DateTimeFormatOptions } from 'luxon'
  * @param timezone - An IANA timezone string (e.g., 'America/Vancouver').
  * @param format - A Luxon format string (e.g., 'MMMM dd, yyyy').
  *
- * Defaults to UTC and ISODate (yyyy-mm-dd) format
+ * Defaults to pacific time ('America/Vancouver') and ISODate (yyyy-mm-dd) format
  *
  * @returns The formatted date string.
  *
@@ -16,7 +16,7 @@ import type { DateTimeFormatOptions } from 'luxon'
  *
  * Formatting https://moment.github.io/luxon/#/formatting?id=table-of-tokens
  */
-export function getToday(timezone = 'UTC', format?: string): string {
+export function getToday(timezone = 'America/Vancouver', format?: string): string {
   const dt = DateTime.now().setZone(timezone)
 
   // dt will return null if an invalid timezone was provided
@@ -29,6 +29,20 @@ export function getToday(timezone = 'UTC', format?: string): string {
   }
 
   return dt.toISODate()
+}
+
+/**
+ * Converts an iso date string (YYYY-MM-DD) to an API date-time string in UTC, at midnight in the
+ * given timezone (defaults to pacific time).
+ * @example "2021-01-01" -> "2021-01-01T08:00:00+00:00" // PST
+ * @example "2021-07-01" -> "2021-07-01T07:00:00+00:00" // PDT
+ */
+export function toApiDateTime(
+  dateStr: IsoDatePacific,
+  timezone = 'America/Vancouver'
+): ApiDateTimeUtc | undefined {
+  const newDate = DateTime.fromISO(dateStr, { zone: timezone })
+  return newDate.isValid ? newDate.toUTC().toFormat('yyyy-MM-dd\'T\'HH:mm:ssZZ') : undefined
 }
 
 /**
@@ -68,11 +82,18 @@ export function toFormattedDateStr(
  * @example "2021-01-01 08:00:00 GMT" -> "January 1, 2021 at 12:00 pm Pacific time"
  */
 export function toPacificDateTime(date: Date): string | undefined {
-  const dateStr = toFormattedDateStr(date, { ...DateTime.DATETIME_FULL, timeZoneName: undefined })
-  const { t } = useI18n()
-  return dateStr
-    ? `${dateStr.replace('AM', 'am').replace('PM', 'pm')} ${t('label.pacificTime')}`
-    : undefined
+  const dt = DateTime.fromJSDate(date, { zone: 'America/Vancouver' })
+  if (!dt.isValid) {
+    return undefined
+  }
+
+  const t = useNuxtApp().$i18n.t
+
+  const formatted = dt.toFormat("LLLL d, yyyy 'at' h:mm a")
+    .replace('AM', 'am')
+    .replace('PM', 'pm')
+
+  return `${formatted} ${t('label.pacificTime')}`
 }
 
 /**

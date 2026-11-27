@@ -1,0 +1,36 @@
+<script setup lang="ts">
+import mockClasses from '#test-mocks/business-share-classes/json/currency-other.json'
+
+definePageMeta({
+  layout: 'connect-auth',
+  breadcrumbs: [{ label: 'Examples', to: '/' }, { label: 'Manage Share Structure (currency other)' }]
+})
+
+const { shareClasses } = useManageShareStructure()
+shareClasses.value = formatShareClassesSection(mockClasses.shareClasses)
+
+const loading = ref(false)
+
+const formState = reactive<{
+  activeSubject: ActiveShareStructureSchema
+}>({
+  activeSubject: undefined
+})
+</script>
+
+<template>
+  <UContainer>
+    <ConnectPageSection
+      :heading="{ label: 'Manage Share Structure - Currency Other' }"
+      ui-body="p-10"
+    >
+      <ManageShareStructure
+        v-model:active-subject="formState.activeSubject"
+        model-name="activeSubject.value"
+        :loading="loading"
+        :empty-text="loading ? `Loading...` : 'No classes'"
+        subject="Share Class"
+      />
+    </ConnectPageSection>
+  </UContainer>
+</template>

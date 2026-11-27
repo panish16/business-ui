@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { setupCorrectionPage, navigateToCorrectionPage } from '../../test-utils'
+import {
+  setupCorrectionPage,
+  navigateToCorrectionPage,
+  assertCommonFilingElements,
+  assertOfficeRows,
+  assertDirectorCount
+} from '../../test-utils'
 import { CRCTN, CRCTN_NO_FEE } from '~~/tests/mocks'
 
 const identifier = 'BC1234567'
@@ -11,38 +17,22 @@ async function makeDirectorEdit(page: Page, fillValue: string) {
   const directors = page.getByTestId('current-directors-section').locator('tbody')
   const rowToEdit = directors.locator('tr').first()
   const streetInput = directors.getByTestId('mailing-address-input-streetAdditional')
+  const sameAsMailingCheckbox = directors.getByRole('checkbox', { name: 'Delivery Address same as Mailing Address' })
   await rowToEdit.getByRole('button', { name: 'Correct' }).click()
   await expect(streetInput).toBeVisible()
+  await streetInput.fill(fillValue)
+  // Editing the mailing address debounce-resets "same as mailing" for 100ms by design
+  // (see Form/Address/index.vue) — wait it out, then re-confirm delivery matches mailing.
+  await page.waitForTimeout(200)
   await expect(async () => {
     if (await streetInput.isVisible()) {
-      await streetInput.fill(fillValue)
+      if (!(await sameAsMailingCheckbox.isChecked())) {
+        await sameAsMailingCheckbox.check({ force: true })
+      }
       await directors.getByRole('button', { name: 'Done' }).click()
     }
     await expect(streetInput).not.toBeVisible()
   }).toPass({ timeout: 15000 })
-}
-
-async function assertCommonElements(page: Page) {
-  await expect(page.getByText(/loading/i)).not.toBeVisible({ timeout: 15000 })
-  // has auth header
-  await expect(page.getByTestId('connect-header-wrapper')).toBeVisible()
-  // has breadcrumb
-  await expect(page.getByTestId('connect-breadcrumb-wrapper')).toBeVisible()
-  await expect(page.getByTestId('connect-breadcrumb-wrapper').getByText('Correction')).toBeVisible()
-  // has tombstone
-  await expect(page.getByTestId('connect-tombstone-wrapper')).toBeVisible()
-  await expect(page.getByTestId('connect-tombstone-wrapper')
-    .getByText('MCELROY ENTERPRISES LTD. - QA_IMPORT_TEST')
-  ).toBeVisible()
-  // has heading
-  await expect(page.getByRole('heading', { name: 'Correction', exact: true })).toBeVisible()
-  // has fee summary
-  await expect(page.getByTestId('fee-widget')).toBeVisible()
-  await expect(page.getByTestId('fee-widget').getByText('Correction')).toBeVisible()
-  // has buttons
-  await expect(page.getByTestId('connect-button-control')).toBeVisible()
-  // has footer
-  await expect(page.getByTestId('connect-main-footer')).toBeVisible()
 }
 
 async function assertStep1Sections(page: Page) {
@@ -52,30 +42,15 @@ async function assertStep1Sections(page: Page) {
   await expect(page.getByTestId('current-directors-section')).toBeVisible()
   // has share structure section
   await expect(page.getByTestId('share-structure-section')).toBeVisible()
-  // has receivers section
-  await expect(page.getByTestId('receivers-section')).toBeVisible()
-  // has liquidators section
-  await expect(page.getByTestId('liquidators-section')).toBeVisible()
+  // has court orders section
+  await expect(page.getByTestId('court-orders-section')).toBeVisible()
+  // no receivers or liquidators section - not on the corrected incorporation application
+  await expect(page.getByTestId('receivers-section')).not.toBeVisible()
+  await expect(page.getByTestId('liquidators-section')).not.toBeVisible()
+  // no custodians section - not on the corrected incorporation application
+  await expect(page.getByTestId('custodians-section')).not.toBeVisible()
   // correction comment section should NOT be on step 1 (it's on step 2)
   await expect(page.getByTestId('correction-comment-section')).not.toBeVisible()
-}
-
-async function assertCorrectOffices(page: Page) {
-  const section = page.getByTestId('office-addresses-section')
-  const tbody = section.locator('tbody')
-  await expect(tbody).toContainText('Registered Office')
-  await expect(tbody).toContainText('Records Office')
-
-  const rows = tbody.locator('tr')
-  await expect(rows).toHaveCount(2)
-}
-
-async function assertCorrectDirectors(page: Page) {
-  const section = page.getByTestId('current-directors-section')
-  const tbody = section.locator('tbody')
-
-  const rows = tbody.locator('tr')
-  await expect(rows).toHaveCount(3)
 }
 
 test.describe('Correction - Page init', () => {
@@ -85,10 +60,14 @@ test.describe('Correction - Page init', () => {
       await navigateToCorrectionPage(page, identifier, filingId)
       await page.waitForLoadState('networkidle')
 
-      await assertCommonElements(page)
+      await assertCommonFilingElements(page, { title: 'Correction' })
       await assertStep1Sections(page)
-      await assertCorrectOffices(page)
-      await assertCorrectDirectors(page)
+      // the mock is an Incorporation Application, which can't correct the Liquidation Records Office
+      await assertOfficeRows(page, {
+        present: ['Registered Office', 'Records Office'],
+        absent: ['Liquidation Records Office']
+      })
+      await assertDirectorCount(page, 3)
 
       // Staff correction should show No Fee
       await expect(page.getByTestId('fee-widget').getByText('No Fee')).toBeVisible()
@@ -101,10 +80,14 @@ test.describe('Correction - Page init', () => {
       await navigateToCorrectionPage(page, identifier, filingId)
       await page.waitForLoadState('networkidle')
 
-      await assertCommonElements(page)
+      await assertCommonFilingElements(page, { title: 'Correction' })
       await assertStep1Sections(page)
-      await assertCorrectOffices(page)
-      await assertCorrectDirectors(page)
+      // the mock is an Incorporation Application, which can't correct the Liquidation Records Office
+      await assertOfficeRows(page, {
+        present: ['Registered Office', 'Records Office'],
+        absent: ['Liquidation Records Office']
+      })
+      await assertDirectorCount(page, 3)
     })
   })
 
@@ -165,6 +148,7 @@ test.describe('Correction - Page init', () => {
       await expect(page.getByTestId('review-share-structure-section')).not.toBeVisible()
       await expect(page.getByTestId('review-receivers-section')).not.toBeVisible()
       await expect(page.getByTestId('review-liquidators-section')).not.toBeVisible()
+      await expect(page.getByTestId('review-custodians-section')).not.toBeVisible()
     })
 
     test('should show completing party on step 2 for client corrections', async ({ page }) => {
@@ -286,5 +270,33 @@ test.describe('Correction - Page init', () => {
       // No-changes alert should NOT be visible when changes exist
       await expect(page.getByTestId('no-changes-alert')).not.toBeVisible()
     })
+  })
+})
+
+test.describe('Correction - Custodians section visibility', () => {
+  test('should hide custodians when not correcting a voluntary dissolution', async ({ page }) => {
+    await setupCorrectionPage(page, identifier, filingId, CRCTN_NO_FEE, 'STAFF', 'STAFF')
+    await navigateToCorrectionPage(page, identifier, filingId)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText(/loading/i)).not.toBeVisible({ timeout: 15000 })
+    await expect(page.getByTestId('current-directors-section')).toBeVisible()
+    await expect(page.getByTestId('custodians-section')).not.toBeVisible()
+  })
+
+  test('should only show custodians and court orders when correcting a voluntary dissolution', async ({ page }) => {
+    await setupCorrectionPage(page, identifier, filingId, CRCTN_NO_FEE, 'STAFF', 'STAFF', {
+      correctedFiling: { filingType: 'dissolution', data: { dissolutionType: 'voluntary' } }
+    })
+    await navigateToCorrectionPage(page, identifier, filingId)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText(/loading/i)).not.toBeVisible({ timeout: 15000 })
+    await expect(page.getByTestId('custodians-section')).toBeVisible()
+    await expect(page.getByTestId('court-orders-section')).toBeVisible()
+
+    await expect(page.getByTestId('office-addresses-section')).not.toBeVisible()
+    await expect(page.getByTestId('current-directors-section')).not.toBeVisible()
+    await expect(page.getByTestId('receivers-section')).not.toBeVisible()
+    await expect(page.getByTestId('liquidators-section')).not.toBeVisible()
+    await expect(page.getByTestId('share-structure-section')).not.toBeVisible()
   })
 })
